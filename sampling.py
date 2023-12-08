@@ -107,13 +107,6 @@ ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
 ax.figure.savefig(Path("./figures/overlap_matrix.png"))
 org_overlap_matrix = mbar_estimator.overlap_matrix
 
-balance_density_matrix = np.zeros((STATE_NUM, STATE_NUM))
-for i in range(STATE_NUM):
-    for j in range(STATE_NUM):
-        u_ij = sample_objs[i].calcRelativePotentialOnTraj([Vec3(x0_list[j], 0, 0), ])[0]
-        balance_density_matrix[i, j] = np.exp(f_k[i]-u_ij)
-# print("balance density matrix: \n{}".format(balance_density_matrix))
-
 estimate_start_lambda_idx = 6
 estimate_end_lambda_idx = 16
 i = estimate_start_lambda_idx
@@ -152,10 +145,6 @@ for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
               sum([org_overlap_matrix[l, k] for l in range(STATE_NUM)]) for k in range(STATE_NUM)])
     C2 = sum([org_overlap_matrix[i, k] * org_overlap_matrix[j, k] /
               sum([org_overlap_matrix[l, k] for l in remain_lambda_list]) for k in range(STATE_NUM)])
-    # C1 = sum([balance_density_matrix[i, k] * balance_density_matrix[j, k] /
-    #           sum([balance_density_matrix[l, k] for l in range(STATE_NUM)]) for k in range(STATE_NUM)])
-    # C2 = sum([balance_density_matrix[i, k] * balance_density_matrix[j, k] /
-    #           sum([balance_density_matrix[l, k] for l in remain_lambda_list]) for k in range(STATE_NUM)])
     print("\nC1: {}, C2: {}".format(C1, C2))
     C = np.exp(1 - C2 / C1)
     print(f"{estimate_start_lambda_idx}->{j}, C: {C}, "
