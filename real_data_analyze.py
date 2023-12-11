@@ -64,7 +64,7 @@ for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
     #           sum([org_overlap_matrix[l, k] for l in remain_lambda_list]) for k in range(STATE_NUM)])
     C1 = sum([partial_overlap_matrix[k][i][j] for k in remain_lambda_list])
     C2 = sum([partial_overlap_matrix[k][i][j] for k in range(STATE_NUM)])
-    print("\nC1: {}, C2: {}".format(C1, C2))
+    print("\nC1: {}, C2: {}, org/C2: {}".format(C1, C2, org_overlap_matrix[estimate_start_lambda_idx, j] / C2))
     C = C2 / C1
     # C = np.exp(1 - C2 / C1)
     print(f"{estimate_start_lambda_idx}->{j}, C: {C}, "
