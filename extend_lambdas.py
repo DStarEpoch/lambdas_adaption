@@ -1,12 +1,16 @@
 # -*- coding:utf-8 -*-
 import random
+import warnings
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import matplotlib.pyplot as plt
 from collections import Counter
 from alchemlyb.estimators import MBAR
 from util.real_data_handler import RealDataHandler
 from alchemlyb.visualisation import plot_mbar_overlap_matrix
+
+warnings.filterwarnings("ignore")
 
 fig_path = Path("./figures")
 fig_path.mkdir(parents=True, exist_ok=True)
@@ -23,8 +27,13 @@ for i in range(len(org_mbar_estimator.delta_f_) - 1):
     print(f"{i} -> {i + 1}: {org_mbar_estimator.delta_f_.iloc[i, i + 1]}, f_k: {f_k[i + 1]}")
 
 
+plot_data = {
+    "x": [],
+    "estimate": [],
+    "real": [],
+}
 estimate_start_lambda_idx = 15
-for interval in range(1, 10):
+for interval in range(1, 11):
     neighbour_lambda_idx = estimate_start_lambda_idx + interval + 1
     insert_lambda_idx = round((estimate_start_lambda_idx + neighbour_lambda_idx) / 2)
 
@@ -111,7 +120,19 @@ for interval in range(1, 10):
           f"between [{estimate_start_lambda_idx}, {neighbour_lambda_idx}] \nreal overlap: "
           f"{real_overlap_matrix[estimate_start_lambda_idx, estimate_start_lambda_idx + 1]} \nestimate overlap: "
           f"{bp_overlap_matrix[estimate_start_lambda_idx, estimate_start_lambda_idx + 1]}\n")
+    plot_data["x"].append(f"{estimate_start_lambda_idx}->{insert_lambda_idx}"
+                          f"@[{estimate_start_lambda_idx}, {neighbour_lambda_idx}]")
+    plot_data["estimate"].append(bp_overlap_matrix[estimate_start_lambda_idx, estimate_start_lambda_idx + 1])
+    plot_data["real"].append(real_overlap_matrix[estimate_start_lambda_idx, estimate_start_lambda_idx + 1])
     ax = plot_mbar_overlap_matrix(real_overlap_matrix)
     ax.figure.savefig(fig_path / f"real_overlap_matrix_{interval}.png")
     ax = plot_mbar_overlap_matrix(bp_overlap_matrix)
     ax.figure.savefig(fig_path / f"estimate_overlap_matrix_{interval}.png")
+
+
+plt.close("all")
+h1 = plt.plot(range(len(plot_data["estimate"])), plot_data["estimate"], color="red", marker="o")
+h2 = plt.plot(range(len(plot_data["real"])), plot_data["real"], color="blue", marker="^")
+plt.legend(handles=[h1[0], h2[0]], labels=["estimate", "real"], loc="best")
+plt.xticks(range(len(plot_data["x"])), plot_data["x"], rotation=45)
+plt.show()
