@@ -1,8 +1,9 @@
 # -*- coding:utf-8 -*-
 import pandas as pd
-from typing import List, Union
 from pathlib import Path
 from scipy.constants import R
+from typing import List, Union
+import matplotlib.pyplot as plt
 from functools import cached_property
 
 
@@ -16,6 +17,10 @@ class RealDataHandler:
     @cached_property
     def u_nks(self) -> List[pd.DataFrame]:
         return [self.csvParser(subfile) for subfile in self.energy_files]
+
+    @cached_property
+    def enthalpies(self):
+        return [self.csvEnthalpy(subfile) for subfile in self.energy_files]
 
     @classmethod
     def get_files_from_directory(cls, directory: Union[Path, str],
@@ -44,3 +49,32 @@ class RealDataHandler:
         u_k['window'] = f"{int(csv.parent.name)}"  # for csv
         # set lambda index for later groupby
         return u_k.set_index(['lambda', 'window'])
+
+    def csvEnthalpy(self, csv: Path):
+        KB = R / 1000
+        BETA = 1 / (KB * self.temperature)
+        df = pd.read_csv(csv, na_filter=True, memory_map=True, sep=r"\s+")
+        H = (df.U + df.pV) * BETA
+        return H
+
+
+def plotRealDataEnergyDistribution(directory: str, temperature=310):
+    handler = RealDataHandler.get_files_from_directory(directory=directory, temperature=temperature)
+    enthalpies = handler.enthalpies
+    color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
+    for h_idx in range(len(enthalpies)):
+        h = enthalpies[h_idx]
+        plt.hist(h, bins=20, alpha=0.5, color=color_list[h_idx % len(color_list)], label=f"state_{h_idx}")
+    plt.show()
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--directory", type=str, help="simulation data directory path which should"
+                                                            "contain path of windows of prod_npt.csv")
+    parser.add_argument("-t", "--temperature", type=float, default=310)
+
+    args = parser.parse_args()
+    plotRealDataEnergyDistribution(args.directory, args.temperature)
+
