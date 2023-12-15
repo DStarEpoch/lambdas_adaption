@@ -35,12 +35,16 @@ org_overlap_matrix = mbar_estimator.overlap_matrix
 
 partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
 
-estimate_start_lambda_idx = 15
-estimate_end_lambda_idx = 36
+# estimate_start_lambda_idx = 15
+# estimate_end_lambda_idx = 36
+# estimate_start_lambda_idx = 20
+# estimate_end_lambda_idx = 41
+estimate_start_lambda_idx = 25
+estimate_end_lambda_idx = 46
 i = estimate_start_lambda_idx
 for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
     test_u_nks = []
-    remove_lambda_list = list(range(estimate_start_lambda_idx + 1, j)) + [2, 5, 7, 40, 45, 50, 53, 57, 60]
+    remove_lambda_list = list(range(estimate_start_lambda_idx + 1, j)) + [2, 5, 7, 50, 53, 57, 60]
     remain_lambda_list = [l for l in range(STATE_NUM) if l not in remove_lambda_list]
     lc = -1
     for o in remain_lambda_list:
@@ -69,7 +73,7 @@ for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
     #           sum([org_overlap_matrix[l, k] for l in remain_lambda_list]) for k in range(STATE_NUM)])
     C1 = sum([partial_overlap_matrix[k][i][j] for k in remain_lambda_list])
     C2 = sum([partial_overlap_matrix[k][i][j] for k in range(STATE_NUM)])
-    print("\nC1: {}, C2: {}, org/C2: {}".format(C1, C2, org_overlap_matrix[estimate_start_lambda_idx, j] / C2))
+    print("\nC1: {}, C2: {}".format(C1, C2))
     C = C2 / C1
     # C = np.exp(1 - C2 / C1)
     print(f"{estimate_start_lambda_idx}->{j}, C: {C}, "

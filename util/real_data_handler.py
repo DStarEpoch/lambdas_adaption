@@ -50,7 +50,7 @@ class RealDataHandler:
         # set lambda index for later groupby
         return u_k.set_index(['lambda', 'window'])
 
-    def csvEnthalpy(self, csv: Path):
+    def csvEnthalpy(self, csv: Path) -> pd.DataFrame:
         KB = R / 1000
         BETA = 1 / (KB * self.temperature)
         df = pd.read_csv(csv, na_filter=True, memory_map=True, sep=r"\s+")
@@ -59,12 +59,31 @@ class RealDataHandler:
 
 
 def plotRealDataEnergyDistribution(directory: str, temperature=310):
+    import numpy as np
+    from alchemlyb.estimators import MBAR
     handler = RealDataHandler.get_files_from_directory(directory=directory, temperature=temperature)
     enthalpies = handler.enthalpies
     color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
     for h_idx in range(len(enthalpies)):
         h = enthalpies[h_idx]
         plt.hist(h, bins=20, alpha=0.5, color=color_list[h_idx % len(color_list)], label=f"state_{h_idx}")
+    plt.show()
+
+    org_u_nks = handler.u_nks
+    mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in org_u_nks]))
+    f_k = [0.0]
+    for i in range(len(mbar_estimator.delta_f_) - 1):
+        f_k.append(mbar_estimator.delta_f_.iloc[i, i + 1] + f_k[i])
+    plot_data = []
+    target_idx = 18
+    for state_idx in range(len(enthalpies)):
+        for h_idx in range(len(enthalpies[state_idx])):
+            h = enthalpies[state_idx][h_idx]
+            base_u = sum([np.exp(f_k[k] - org_u_nks[k].iloc[h_idx, state_idx]) for k in range(len(f_k))])
+            ratio = np.exp(f_k[target_idx]-org_u_nks[target_idx].iloc[h_idx, state_idx]) / base_u
+            plot_data.append((h, ratio))
+    plot_data = sorted(plot_data, key=lambda x: x[0])
+    plt.plot([x[0] for x in plot_data], [x[1] for x in plot_data], '-', alpha=0.5)
     plt.show()
 
 

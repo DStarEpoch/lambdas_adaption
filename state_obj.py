@@ -39,7 +39,25 @@ class StateObj(object):
         self.context.setPositions([[x0, 0, 0]])
         self.context.setVelocitiesToTemperature(temperature)
 
-        self.traj: List[List[Vec3]] = list()
+        self._sample_x: List[List[List[Vec3]]] = list()
+
+    @property
+    def traj(self):
+        ret = []
+        for l in self._sample_x:
+            ret += l
+        return ret
+
+    @property
+    def potentials(self):
+        self_cur_pos = self.context.getState(getPositions=True).getPositions()
+        ret = []
+        for l in self._sample_x:
+            for x in l:
+                self.context.setPositions(x)
+                ret.append(self.context.getState(getEnergy=True).getPotentialEnergy() / (self.R * self.temperature))
+        self.context.setPositions(self_cur_pos)
+        return ret
 
     @property
     def properties(self) -> dict:
@@ -49,7 +67,7 @@ class StateObj(object):
         ret["x0"] = self.x0
         ret["velocities"] = self.context.getState(getVelocities=True).getVelocities()
         ret["positions"] = self.context.getState(getPositions=True).getPositions()
-        ret["traj"] = self.traj
+        ret["_sample_x"] = self._sample_x
         ret["brownian_gamma"] = self.brownian_gamma
         ret["integrator_step"] = self.integrator_step
         return ret
@@ -59,7 +77,7 @@ class StateObj(object):
         obj = cls(properties["temperature"], properties["force_constant"], properties["x0"])
         obj.context.setVelocities(properties["velocities"])
         obj.context.setPositions(properties["positions"])
-        obj.traj = properties["traj"]
+        obj._sample_x = properties["_sample_x"]
         obj.brownian_gamma = properties["brownian_gamma"]
         obj.integrator_step = properties["integrator_step"]
         return obj
@@ -70,7 +88,7 @@ class StateObj(object):
             self.integrator.step(1)
             if i % sample_steps == 0:
                 ret_x.append(self.context.getState(getPositions=True).getPositions())
-        self.traj += ret_x
+        self._sample_x.append(ret_x)
         return ret_x
 
     def tryExchange(self, other: StateObj):
