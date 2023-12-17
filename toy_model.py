@@ -5,13 +5,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from alchemlyb.estimators import MBAR
 from util.ising_model import IsingModel
+from alchemlyb.visualisation import plot_mbar_overlap_matrix
 from util.calc_partial_overlap import calc_partial_overlap_matrix
 
 
-state_num = 20
-betas = 1 / np.linspace(1.53, 3.28, state_num)
-N_STEPS = 10000
-EXCHANGE_STEPS = 50
+state_num = 40
+betas = 1 / np.linspace(1.8, 2.0, state_num)
+# betas = 1 / np.linspace(1.53, 3.28, state_num)
+N_STEPS = 2000
+EXCHANGE_STEPS = 20
+SAMPLE_STEPS = 10
 N = 40
 models = [IsingModel(N=N, beta=beta) for beta in betas]
 E = [[] for _ in betas]
@@ -23,18 +26,21 @@ for step in tqdm.tqdm(range(N_STEPS), desc="sampling"):
         model.mcmove()
         E[model_idx].append(model.dimless_energy)
 
-    if step % EXCHANGE_STEPS == 0:
+    if step % SAMPLE_STEPS == (SAMPLE_STEPS - 1):
         for model_idx in range(len(models)):
             config_traj_list[model_idx].append(models[model_idx].config)
-        exchange_flag = exchange_flag ^ True
-        exchange_status = ""
-        for k in range(state_num):
-            if (exchange_flag and k % 2 == 0) or (not exchange_flag and k % 2 == 1):
-                flag = models[k].swap(models[(k + 1) % state_num])
-                exchange_status += f"{k}x" if flag else f"{k} "
-            else:
-                exchange_status += f"{k} "
-        print(f"exchange:\n{exchange_status}")
+    # if step % EXCHANGE_STEPS == 0:
+    #     for model_idx in range(len(models)):
+    #         config_traj_list[model_idx].append(models[model_idx].config)
+    #     exchange_flag = exchange_flag ^ True
+    #     exchange_status = ""
+    #     for k in range(state_num):
+    #         if (exchange_flag and k % 2 == 0) or (not exchange_flag and k % 2 == 1):
+    #             flag = models[k].swap(models[(k + 1) % state_num])
+    #             exchange_status += f"{k}x" if flag else f"{k} "
+    #         else:
+    #             exchange_status += f"{k} "
+    #     print(f"exchange:\n{exchange_status}")
 
 color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
 for model_idx in range(len(models)):
@@ -69,11 +75,19 @@ f_k = [0.0]
 for i in range(len(mbar_estimator.delta_f_) - 1):
     f_k.append(mbar_estimator.delta_f_.iloc[i, i+1] + f_k[i])
     print(f"{i} -> {i+1}: {mbar_estimator.delta_f_.iloc[i, i+1]}, f_k: {f_k[i+1]}")
+ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
+plt.show()
 
+
+
+plot_data = {
+    "x": [],
+    "estimate": [],
+    "real": [],
+}
 partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
-
-estimate_start_lambda_idx = 6
-estimate_end_lambda_idx = 16
+estimate_start_lambda_idx = 10
+estimate_end_lambda_idx = 30
 i = estimate_start_lambda_idx
 for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
     test_u_nks = []
@@ -113,3 +127,13 @@ for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
           f"\nestimate overlap: {org_overlap_matrix[estimate_start_lambda_idx, j] * C}, "
           f"\nreal overlap {test_start_lambda_idx}->{test_start_lambda_idx+1}: "
           f"{test_overlap_matrix[test_start_lambda_idx, test_start_lambda_idx+1]}")
+    plot_data["x"].append(f"{estimate_start_lambda_idx}->{j}")
+    plot_data["estimate"].append(org_overlap_matrix[estimate_start_lambda_idx, j] * C)
+    plot_data["real"].append(test_overlap_matrix[test_start_lambda_idx, test_start_lambda_idx + 1])
+
+plt.close("all")
+h1 = plt.plot(range(len(plot_data["estimate"])), plot_data["estimate"], color="red", marker="o")
+h2 = plt.plot(range(len(plot_data["real"])), plot_data["real"], color="blue", marker="^")
+plt.legend(handles=[h1[0], h2[0]], labels=["estimate", "real"], loc="best")
+plt.xticks(range(len(plot_data["x"])), plot_data["x"], rotation=45)
+plt.show()
