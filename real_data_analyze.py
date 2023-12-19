@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from alchemlyb.estimators import MBAR
 from util.real_data_handler import RealDataHandler
 from alchemlyb.visualisation import plot_mbar_overlap_matrix
+from util.dp_optimizer import DPOptimizer
 from util.calc_partial_overlap import calc_partial_overlap_matrix
 
 fig_path = Path("./figures")
@@ -29,11 +30,11 @@ for i in range(len(mbar_estimator.delta_f_) - 1):
     f_k.append(mbar_estimator.delta_f_.iloc[i, i+1] + f_k[i])
     print(f"{i} -> {i+1}: {mbar_estimator.delta_f_.iloc[i, i+1]}, f_k: {f_k[i+1]}")
 ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
-ax.figure.savefig(fig_path / "overlap_matrix.png")
+plt.show()
 org_overlap_matrix = mbar_estimator.overlap_matrix
 
 
-partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
+partial_overlap_matrix_list = calc_partial_overlap_matrix(mbar_estimator)
 
 # estimate_start_lambda_idx = 15
 # estimate_end_lambda_idx = 36
@@ -64,18 +65,11 @@ for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
     test_u_nks = pd.concat([u_nk for u_nk in test_u_nks])
     test_mbar_estimator = MBAR(method="L-BFGS-B").fit(test_u_nks)
     test_overlap_matrix = test_mbar_estimator.overlap_matrix
-    ax = plot_mbar_overlap_matrix(test_mbar_estimator.overlap_matrix)
-    ax.figure.savefig(fig_path / f"test_real_overlap_matrix_{j}.png")
 
-    # C1 = sum([org_overlap_matrix[i, k] * org_overlap_matrix[j, k] /
-    #           sum([org_overlap_matrix[l, k] for l in range(STATE_NUM)]) for k in range(STATE_NUM)])
-    # C2 = sum([org_overlap_matrix[i, k] * org_overlap_matrix[j, k] /
-    #           sum([org_overlap_matrix[l, k] for l in remain_lambda_list]) for k in range(STATE_NUM)])
-    C1 = sum([partial_overlap_matrix[k][i][j] for k in remain_lambda_list])
-    C2 = sum([partial_overlap_matrix[k][i][j] for k in range(STATE_NUM)])
+    C1 = sum([partial_overlap_matrix_list[k][i][j] for k in remain_lambda_list])
+    C2 = sum([partial_overlap_matrix_list[k][i][j] for k in range(STATE_NUM)])
     print("\nC1: {}, C2: {}".format(C1, C2))
     C = C2 / C1
-    # C = np.exp(1 - C2 / C1)
     print(f"{estimate_start_lambda_idx}->{j}, C: {C}, "
           f"\nestimate overlap: {org_overlap_matrix[estimate_start_lambda_idx, j] * C}, "
           f"\nreal overlap {test_start_lambda_idx}->{test_start_lambda_idx + 1}: "
@@ -90,3 +84,11 @@ h2 = plt.plot(range(len(plot_data["real"])), plot_data["real"], color="blue", ma
 plt.legend(handles=[h1[0], h2[0]], labels=["estimate", "real"], loc="best")
 plt.xticks(range(len(plot_data["x"])), plot_data["x"], rotation=45)
 plt.show()
+
+
+dp_optimizer = DPOptimizer(org_overlap_matrix=org_overlap_matrix,
+                           partial_overlap_matrix_list=partial_overlap_matrix_list,
+                           target_lambda_num=20)
+for e in np.arange(0, 1.05, 0.05):
+    cost, seq = dp_optimizer.optimize(estimate_mean=e)
+    print(f"estimate_mean: {e}, \ncost: {cost}, \nseq: {seq}")
