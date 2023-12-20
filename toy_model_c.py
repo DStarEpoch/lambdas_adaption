@@ -18,7 +18,7 @@ BETAS = 1 / np.linspace(1.6, 2.4, STATE_NUM)
 RELAX_STEPS = 20000
 N_STEPS = 100000
 SAMPLE_STEPS = 100
-N = 50  # N x N grid for the Ising model
+N = 40  # N x N grid for the Ising model
 PROCESSES = 5
 figure_path = Path("./figures")
 figure_path.mkdir(parents=True, exist_ok=True)
