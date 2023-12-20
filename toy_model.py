@@ -80,7 +80,7 @@ else:
         result = parallel_forward(param)
         E[result["idx"]] = result["E_list"]
         config_traj_list[result["idx"]] = result["config_list"]
-        models[x["idx"]] = x["obj"]
+        models[x["idx"]] = result["obj"]
 
 color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
 for model_idx in range(len(E)):

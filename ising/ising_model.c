@@ -23,7 +23,7 @@ typedef struct _IsingModel
 {
     PyObject_HEAD
     int N;
-    double beta;
+    float beta;
     long *spins;
 }IsingModel;
 
