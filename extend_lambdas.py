@@ -75,7 +75,9 @@ for interval in range(1, 11):
         exp_f_insert += sum(np.exp(-u) / base_u) / samples_per_lambda
         all_u_samples[o] = u
     f_insert = -np.log(exp_f_insert)
-    print(f"boltzmann pick sampling estimate f_insert at {insert_lambda_idx}: {f_insert}")
+    fix_f_insert = -np.log(exp_f_insert/(interval+1))
+    print(f"boltzmann pick sampling estimate f_insert at {insert_lambda_idx}: {f_insert}, fix_f_insert: {fix_f_insert}, real_f: {f_k[insert_lambda_idx]}")
+    f_insert = fix_f_insert
     tag_list = []
     w_list = []
     for l_idx in all_u_samples:
