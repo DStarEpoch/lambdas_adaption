@@ -6,7 +6,7 @@ Automaticaly adapt optimal lambdas for FEP calculation
 ### Get the Code
 ```
 git clone --recursive https://github.com/DStarEpoch/lambdas_adaption.git
-cd lambda_adaptions
+cd lambdas_adaption
 ```
 
 ### Build
