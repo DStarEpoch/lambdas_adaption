@@ -16,7 +16,7 @@ STATE_NUM = 50
 BETAS = 1 / np.linspace(1.7, 2.7, STATE_NUM)
 # BETAS = 1 / np.linspace(1.53, 3.28, STATE_NUM)
 RELAX_STEPS = 10000
-N_STEPS = 500000
+N_STEPS = 100000
 SAMPLE_STEPS = 1000
 N = 40  # N x N grid for the Ising model
 PROCESSES = 5
@@ -141,6 +141,10 @@ f_k = [0.0]
 for i in range(len(mbar_estimator.delta_f_) - 1):
     f_k.append(mbar_estimator.delta_f_.iloc[i, i+1] + f_k[i])
     print(f"{i} -> {i+1}: {mbar_estimator.delta_f_.iloc[i, i+1]}, f_k: {f_k[i+1]}")
+plt.close("all")
+plt.gca().set(title='Free Energy', ylabel='f_k')
+plt.plot(BETAS, f_k, color="red", marker="o")
+plt.savefig(figure_path / f"Ising_f_{STATE_NUM}_{N_STEPS}_{N}.png")
 ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
 ax.figure.savefig(figure_path / f"Ising_overlap_matrix_{STATE_NUM}_{N_STEPS}_{N}.png")
 # plt.show()

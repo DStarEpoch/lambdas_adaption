@@ -1,0 +1,8 @@
+bezier~=2023.7.28
+numpy~=1.24.3
+matplotlib~=3.5.3
+pandas~=2.0.3
+scipy~=1.9.3
+tqdm~=4.62.3
+alchemlyb~=0.6.0
+openmm~=7.6.0
