@@ -15,7 +15,7 @@ from util.calc_partial_overlap import calc_partial_overlap_matrix
 
 
 STATE_NUM = 50
-bezier_nodes = np.asarray([(0, 1/1.7), (STATE_NUM, 1 / 1.6),
+bezier_nodes = np.asarray([(0, 1/1.7), (STATE_NUM, 1 / 1.8),
                            (STATE_NUM / 5, 1 / 3.5), (STATE_NUM, 1/2.7)])
 beizer_curve = BezierCurve(bezier_nodes)
 BETAS = [float(beizer_curve.evaluate(i*1.0/STATE_NUM)[1]) for i in range(STATE_NUM)]
@@ -23,7 +23,7 @@ BETAS = [float(beizer_curve.evaluate(i*1.0/STATE_NUM)[1]) for i in range(STATE_N
 # BETAS = 1 / np.linspace(1.7, 2.7, STATE_NUM)
 # BETAS = 1 / np.linspace(1.53, 3.28, STATE_NUM)
 RELAX_STEPS = 10000
-N_STEPS = 100000
+N_STEPS = 200000
 SAMPLE_STEPS = 1000
 N = 40  # N x N grid for the Ising model
 PROCESSES = 5
@@ -156,25 +156,56 @@ ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
 ax.figure.savefig(figure_path / f"Ising_overlap_matrix_{STATE_NUM}_{N_STEPS}_{N}.png")
 # plt.show()
 
+opt_target_num = 20
 partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
-dp_optimizer = DPOptimizer(partial_overlap_matrix, org_overlap_matrix, 20)
-guess_mean = 0.9
-solution_seq = [0, ]
+dp_optimizer = DPOptimizer(partial_overlap_matrix, org_overlap_matrix, opt_target_num)
+best_seq = []
+best_cost = 100000
+# for guess_mean in np.arange(0, 1.05, 0.05):
+#     min_cost, solution_seq, opt_mean = dp_optimizer.optimize(guess_mean)
+#     print(f"dp_optimizer min_cost: {min_cost} guess_mean: {guess_mean} opt_mean: {opt_mean} "
+#           f"\nsolution_seq: {solution_seq}\n")
+#     if min_cost < best_cost:
+#         best_cost = min_cost
+#         best_seq = solution_seq
+guess_mean = 0.5
 for i in range(5):
     min_cost, solution_seq, opt_mean = dp_optimizer.optimize(guess_mean)
+    print(f"dp_optimizer min_cost: {min_cost} guess_mean: {guess_mean} opt_mean: {opt_mean} "
+          f"\nsolution_seq: {solution_seq}\n")
     guess_mean = opt_mean
-    print(f"dp_optimizer min_cost: {min_cost}  opt_mean: {opt_mean} \nsolution_seq: {solution_seq}")
-plt.close("all")
-plt.plot(range(len(solution_seq)), [f_k[s] for s in solution_seq], color="red", marker="o")
-plt.savefig(figure_path / f"Ising_dp_optimizer_{STATE_NUM}_{N_STEPS}_{N}.png")
+    if min_cost < best_cost:
+        best_cost = min_cost
+        best_seq = solution_seq
+evenly_seq = [round(i) for i in np.linspace(0, STATE_NUM-1, opt_target_num)]
+
+for key, seq in {"evenly": evenly_seq, "opt": best_seq}.items():
+    plt.close("all")
+    test_u_nks = []
+    lc = -1
+    remove_lambda_list = [l for l in range(STATE_NUM) if l not in seq]
+    for o in seq:
+        lc += 1
+        u_k = org_u_nks[o].drop(columns=[str(l) for l in remove_lambda_list])
+        u_k.columns = [f'{i}' for i in range(len(u_k.columns))]
+        # add a column to df for using groupby
+        u_k['lambda'] = f"lambda_{lc}"
+        u_k['window'] = f"{lc}"
+        # set lambda index for later groupby
+        u_k = u_k.set_index(['lambda', 'window'])
+        test_u_nks.append(u_k)
+    test_u_nks = pd.concat([u_nk for u_nk in test_u_nks])
+    test_mbar_estimator = MBAR(method="L-BFGS-B").fit(test_u_nks)
+    ax = plot_mbar_overlap_matrix(test_mbar_estimator.overlap_matrix)
+    ax.figure.savefig(figure_path / f"Ising_lambda_{key}_{STATE_NUM}_{N_STEPS}_{N}.png")
 
 plot_data = {
     "x": [],
     "estimate": [],
     "real": [],
 }
-estimate_start_lambda_idx = 10
-estimate_end_lambda_idx = 30
+estimate_start_lambda_idx = 0
+estimate_end_lambda_idx = 20
 i = estimate_start_lambda_idx
 for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
     test_u_nks = []

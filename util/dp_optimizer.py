@@ -6,17 +6,19 @@ from functools import partial
 
 
 def calcEstOverlap(partial_overlap_matrix_list: List[np.matrix], org_overlap_matrix: np.matrix,
-                   target_lambda_num: int, retained_lambda_idx: List[int],
+                   target_lambda_num: int, retained_lambda_idx: List[int], input_remove_lambda_idx: List[int],
                    lambda1: int, lambda2: int):
     total_lambda_num = len(partial_overlap_matrix_list[0])
     average_interval = round((total_lambda_num - len(retained_lambda_idx)) /
                              (target_lambda_num - len(retained_lambda_idx) + 1))
     # guess which remaining lambdas are not used in the calculation
     remove_lambda_list = list(range(lambda1 + 1, lambda2)) + \
-                         [l for l in range(0, lambda1, average_interval) if l not in retained_lambda_idx] + \
+                         [l for l in range(0, lambda1, average_interval)
+                          if l not in retained_lambda_idx] + \
                          [l for l in range(lambda2+1, total_lambda_num, average_interval)
                           if l not in retained_lambda_idx]
-    remain_lambda_list = [l for l in range(total_lambda_num) if l not in remove_lambda_list]
+    remain_lambda_list = [l for l in range(total_lambda_num) if
+                          (l not in remove_lambda_list and l not in input_remove_lambda_idx)]
     # calculate C factor for overlap estimation
     C1 = sum([partial_overlap_matrix_list[k][lambda1][lambda2] for k in remain_lambda_list])
     C2 = sum([partial_overlap_matrix_list[k][lambda1][lambda2] for k in range(total_lambda_num)])
@@ -69,13 +71,12 @@ def cost_func(estimate_overlap_func,
     for i in range(len(idx_seq) - 1):
         if idx_seq[i] not in insert_idx and idx_seq[i+1] not in insert_idx:
             continue
-        O_ij = estimate_overlap_func(idx_seq[i], idx_seq[i+1])
-        O_ii = estimate_overlap_func(idx_seq[i], idx_seq[i])
-        O_jj = estimate_overlap_func(idx_seq[i+1], idx_seq[i+1])
+        input_remove_lambda_idx = range(idx_seq[i] + 1, idx_seq[i + 1])
+        O_ij = estimate_overlap_func(input_remove_lambda_idx, idx_seq[i], idx_seq[i+1])
+        O_ii = estimate_overlap_func(input_remove_lambda_idx, idx_seq[i], idx_seq[i])
+        O_jj = estimate_overlap_func(input_remove_lambda_idx, idx_seq[i+1], idx_seq[i+1])
         area = O_ij*O_ij / (O_ii*O_jj)
-        overlap_area_list.append(
-            area
-        )
+        overlap_area_list.append(area)
 
     if len(overlap_area_list) <= 0:
         return float('inf')
@@ -129,20 +130,24 @@ def findOptLambdasByDP(estimate_overlap_func,
         if dp[n - 1][m - 1][k].cost < min_cost:
             min_cost = dp[n - 1][m - 1][k].cost
             solution_seq = dp[n - 1][m - 1][k].sequence
+    solution_seq += retained_lambda_idx
+    solution_seq.sort()
+
     area_mean = 0.0
+    best_area_list = []
     count = 0
     for i in range(len(solution_seq) - 1):
+        input_remove_lambda_idx = range(solution_seq[i] + 1, solution_seq[i + 1])
+        O_ij = estimate_overlap_func(input_remove_lambda_idx, solution_seq[i], solution_seq[i + 1])
+        O_ii = estimate_overlap_func(input_remove_lambda_idx, solution_seq[i], solution_seq[i])
+        O_jj = estimate_overlap_func(input_remove_lambda_idx, solution_seq[i + 1], solution_seq[i + 1])
+        best_area_list.append((solution_seq[i], solution_seq[i + 1], O_ij*O_ij / (O_ii*O_jj), O_ij, O_ii, O_jj))
         if solution_seq[i] in retained_lambda_idx and solution_seq[i + 1] in retained_lambda_idx:
             continue
         count += 1
-        O_ij = estimate_overlap_func(solution_seq[i], solution_seq[i + 1])
-        O_ii = estimate_overlap_func(solution_seq[i], solution_seq[i])
-        O_jj = estimate_overlap_func(solution_seq[i + 1], solution_seq[i + 1])
         area_mean += O_ij*O_ij / (O_ii*O_jj)
     area_mean /= count
-
-    solution_seq += retained_lambda_idx
-    solution_seq.sort()
+    print(f"best_area_list: {[f'{i}<->{j}: {round(a, 3)}, O_ij:{round(O_ij, 3)}, O_ii:{round(O_ii, 3)}, O_jj:{round(O_jj, 3)}' for i, j, a, O_ij, O_ii, O_jj in best_area_list]}")
     return min_cost, solution_seq, area_mean
 
 
