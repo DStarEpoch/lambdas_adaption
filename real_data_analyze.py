@@ -90,5 +90,5 @@ dp_optimizer = DPOptimizer(org_overlap_matrix=org_overlap_matrix,
                            partial_overlap_matrix_list=partial_overlap_matrix_list,
                            target_lambda_num=8)
 for e in np.arange(0, 1.25, 0.05):
-    cost, seq = dp_optimizer.optimize(estimate_mean=e)
-    print(f"estimate_mean: {e}, \ncost: {cost}, \nseq: {seq}")
+    cost, seq, opt_mean = dp_optimizer.optimize(estimate_mean=e)
+    print(f"estimate_mean: {e}, \ncost: {cost}, \nseq: {seq}, \nopt_mean: {opt_mean}\n")

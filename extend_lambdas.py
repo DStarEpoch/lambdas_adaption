@@ -76,7 +76,8 @@ for interval in range(1, 11):
         all_u_samples[o] = u
     f_insert = -np.log(exp_f_insert)
     fix_f_insert = -np.log(exp_f_insert/(interval+1))
-    print(f"boltzmann pick sampling estimate f_insert at {insert_lambda_idx}: {f_insert}, fix_f_insert: {fix_f_insert}, real_f: {f_k[insert_lambda_idx]}")
+    print(f"boltzmann pick sampling estimate f_insert at {insert_lambda_idx}: {f_insert}, "
+          f"fix_f_insert: {fix_f_insert}, real_f: {f_k[insert_lambda_idx]}")
     f_insert = fix_f_insert
     tag_list = []
     w_list = []
@@ -126,10 +127,10 @@ for interval in range(1, 11):
                           f"@[{estimate_start_lambda_idx}, {neighbour_lambda_idx}]")
     plot_data["estimate"].append(bp_overlap_matrix[estimate_start_lambda_idx, estimate_start_lambda_idx + 1])
     plot_data["real"].append(real_overlap_matrix[estimate_start_lambda_idx, estimate_start_lambda_idx + 1])
-    ax = plot_mbar_overlap_matrix(real_overlap_matrix)
-    ax.figure.savefig(fig_path / f"real_overlap_matrix_{interval}.png")
-    ax = plot_mbar_overlap_matrix(bp_overlap_matrix)
-    ax.figure.savefig(fig_path / f"estimate_overlap_matrix_{interval}.png")
+    # ax = plot_mbar_overlap_matrix(real_overlap_matrix)
+    # ax.figure.savefig(fig_path / f"real_overlap_matrix_{interval}.png")
+    # ax = plot_mbar_overlap_matrix(bp_overlap_matrix)
+    # ax.figure.savefig(fig_path / f"estimate_overlap_matrix_{interval}.png")
 
 
 plt.close("all")

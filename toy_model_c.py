@@ -9,11 +9,18 @@ import matplotlib.pyplot as plt
 from multiprocessing import Pool
 from alchemlyb.estimators import MBAR
 from alchemlyb.visualisation import plot_mbar_overlap_matrix
+from util.fit_curve import BezierCurve
+from util.dp_optimizer import DPOptimizer
 from util.calc_partial_overlap import calc_partial_overlap_matrix
 
 
 STATE_NUM = 50
-BETAS = 1 / np.linspace(1.7, 2.7, STATE_NUM)
+bezier_nodes = np.asarray([(0, 1/1.7), (STATE_NUM, 1 / 1.6),
+                           (STATE_NUM / 5, 1 / 3.5), (STATE_NUM, 1/2.7)])
+beizer_curve = BezierCurve(bezier_nodes)
+BETAS = [float(beizer_curve.evaluate(i*1.0/STATE_NUM)[1]) for i in range(STATE_NUM)]
+# BETAS = np.linspace(1/2.7, 1/1.7, STATE_NUM)
+# BETAS = 1 / np.linspace(1.7, 2.7, STATE_NUM)
 # BETAS = 1 / np.linspace(1.53, 3.28, STATE_NUM)
 RELAX_STEPS = 10000
 N_STEPS = 100000
@@ -142,19 +149,30 @@ for i in range(len(mbar_estimator.delta_f_) - 1):
     f_k.append(mbar_estimator.delta_f_.iloc[i, i+1] + f_k[i])
     print(f"{i} -> {i+1}: {mbar_estimator.delta_f_.iloc[i, i+1]}, f_k: {f_k[i+1]}")
 plt.close("all")
-plt.gca().set(title='Free Energy', ylabel='f_k')
-plt.plot(BETAS, f_k, color="red", marker="o")
+plt.gca().set(title='Free Energy', ylabel='f_k', xlabel="lambda")
+plt.plot(range(len(BETAS)), f_k, color="red", marker="o")
 plt.savefig(figure_path / f"Ising_f_{STATE_NUM}_{N_STEPS}_{N}.png")
 ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
 ax.figure.savefig(figure_path / f"Ising_overlap_matrix_{STATE_NUM}_{N_STEPS}_{N}.png")
 # plt.show()
+
+partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
+dp_optimizer = DPOptimizer(partial_overlap_matrix, org_overlap_matrix, 20)
+guess_mean = 0.9
+solution_seq = [0, ]
+for i in range(5):
+    min_cost, solution_seq, opt_mean = dp_optimizer.optimize(guess_mean)
+    guess_mean = opt_mean
+    print(f"dp_optimizer min_cost: {min_cost}  opt_mean: {opt_mean} \nsolution_seq: {solution_seq}")
+plt.close("all")
+plt.plot(range(len(solution_seq)), [f_k[s] for s in solution_seq], color="red", marker="o")
+plt.savefig(figure_path / f"Ising_dp_optimizer_{STATE_NUM}_{N_STEPS}_{N}.png")
 
 plot_data = {
     "x": [],
     "estimate": [],
     "real": [],
 }
-partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
 estimate_start_lambda_idx = 10
 estimate_end_lambda_idx = 30
 i = estimate_start_lambda_idx

@@ -22,11 +22,7 @@ def calcEstOverlap(partial_overlap_matrix_list: List[np.matrix], org_overlap_mat
     C2 = sum([partial_overlap_matrix_list[k][lambda1][lambda2] for k in range(total_lambda_num)])
     C = C2 / C1
     estimate_overlap = org_overlap_matrix[lambda1, lambda2] * C
-    C1 = sum([partial_overlap_matrix_list[k][lambda1][lambda1] for k in remain_lambda_list])
-    C2 = sum([partial_overlap_matrix_list[k][lambda1][lambda1] for k in range(total_lambda_num)])
-    C = C2 / C1
-    diag_overlap = org_overlap_matrix[lambda1, lambda1] * C
-    return estimate_overlap / diag_overlap
+    return estimate_overlap
 
 
 class DPInfo:
@@ -73,8 +69,12 @@ def cost_func(estimate_overlap_func,
     for i in range(len(idx_seq) - 1):
         if idx_seq[i] not in insert_idx and idx_seq[i+1] not in insert_idx:
             continue
+        O_ij = estimate_overlap_func(idx_seq[i], idx_seq[i+1])
+        O_ii = estimate_overlap_func(idx_seq[i], idx_seq[i])
+        O_jj = estimate_overlap_func(idx_seq[i+1], idx_seq[i+1])
+        area = O_ij*O_ij / (O_ii*O_jj)
         overlap_area_list.append(
-            estimate_overlap_func(idx_seq[i], idx_seq[i+1])
+            area
         )
 
     if len(overlap_area_list) <= 0:
@@ -90,7 +90,7 @@ def cost_func(estimate_overlap_func,
 def findOptLambdasByDP(estimate_overlap_func,
                        overlap_matrix: np.matrix,
                        target_lambda_num: int, estimate_mean: float,
-                       retained_lambda_idx: List[int] = None) -> Tuple[float, List[int]]:
+                       retained_lambda_idx: List[int] = None) -> Tuple[float, List[int], float]:
     if retained_lambda_idx is None:
         retained_lambda_idx = [0, len(overlap_matrix) - 1]
 
@@ -129,10 +129,21 @@ def findOptLambdasByDP(estimate_overlap_func,
         if dp[n - 1][m - 1][k].cost < min_cost:
             min_cost = dp[n - 1][m - 1][k].cost
             solution_seq = dp[n - 1][m - 1][k].sequence
+    area_mean = 0.0
+    count = 0
+    for i in range(len(solution_seq) - 1):
+        if solution_seq[i] in retained_lambda_idx and solution_seq[i + 1] in retained_lambda_idx:
+            continue
+        count += 1
+        O_ij = estimate_overlap_func(solution_seq[i], solution_seq[i + 1])
+        O_ii = estimate_overlap_func(solution_seq[i], solution_seq[i])
+        O_jj = estimate_overlap_func(solution_seq[i + 1], solution_seq[i + 1])
+        area_mean += O_ij*O_ij / (O_ii*O_jj)
+    area_mean /= count
 
     solution_seq += retained_lambda_idx
     solution_seq.sort()
-    return min_cost, solution_seq
+    return min_cost, solution_seq, area_mean
 
 
 class DPOptimizer(object):
@@ -148,9 +159,13 @@ class DPOptimizer(object):
         self._target_lambda_num = target_lambda_num
         if retained_lambda_idx is None:
             retained_lambda_idx = [0, len(org_overlap_matrix) - 1]
+        else:
+            retained_lambda_idx = list(set([0, len(org_overlap_matrix) - 1] +
+                                           [l % len(org_overlap_matrix) for l in retained_lambda_idx]))
+            retained_lambda_idx.sort()
         self._retained_lambda_idx = retained_lambda_idx
 
-    def optimize(self, estimate_mean) -> Tuple[float, List[int]]:
+    def optimize(self, estimate_mean) -> Tuple[float, List[int], float]:
         return findOptLambdasByDP(
             partial(calcEstOverlap, self._partial_overlap_matrix_list, self._org_overlap_matrix,
                     self._target_lambda_num, self._retained_lambda_idx),
