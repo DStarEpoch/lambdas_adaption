@@ -58,8 +58,14 @@ class RealDataHandler:
         return H
 
 
-def plotRealDataEnergyDistribution(directory: str, temperature=310):
+def real_data_test(directory: str, temperature=310, target_lambda_num=16):
+    from shortest_path_opt.shortest_path import DPShortestPath
     handler = RealDataHandler.get_files_from_directory(directory=directory, temperature=temperature)
+    dp_shortest_path = DPShortestPath(handler.u_nks)
+    min_cost, optimal_sequence = dp_shortest_path.optimize(target_lambda_num=target_lambda_num,
+                                                           retain_lambda_idx=[0, 1, 2, 3, 4, 5, 6, 7])
+    print(f"min_cost: {min_cost} \noptimal_sequence: {optimal_sequence}")
+
     enthalpies = handler.enthalpies
     color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
     for h_idx in range(len(enthalpies)):
@@ -76,5 +82,5 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--temperature", type=float, default=310)
 
     args = parser.parse_args()
-    plotRealDataEnergyDistribution(args.directory, args.temperature)
+    real_data_test(args.directory, args.temperature)
 

@@ -147,7 +147,6 @@ def findOptLambdasByDP(estimate_overlap_func,
         count += 1
         area_mean += O_ij*O_ij / (O_ii*O_jj)
     area_mean /= count
-    print(f"best_area_list: {[f'{i}<->{j}: {round(a, 3)}, O_ij:{round(O_ij, 3)}, O_ii:{round(O_ii, 3)}, O_jj:{round(O_jj, 3)}' for i, j, a, O_ij, O_ii, O_jj in best_area_list]}")
     return min_cost, solution_seq, area_mean
 
 

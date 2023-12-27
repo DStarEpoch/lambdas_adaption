@@ -374,7 +374,8 @@ static PyTypeObject IsingModelType = {
     .tp_basicsize=sizeof(IsingModel),
     .tp_itemsize=0,
     .tp_flags=Py_TPFLAGS_DEFAULT,
-    .tp_doc="IsingModel objects",
+    .tp_doc="IsingModel objects\n"
+            "IsingModel(N: int, beta:float)\n",
     .tp_dealloc=(destructor)IsingModel_dealloc,
     .tp_new=IsingModel_new,
     .tp_init=(initproc)IsingModel_init,

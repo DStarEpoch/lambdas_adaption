@@ -12,6 +12,7 @@ from alchemlyb.visualisation import plot_mbar_overlap_matrix
 from util.fit_curve import BezierCurve
 from util.dp_optimizer import DPOptimizer
 from util.calc_partial_overlap import calc_partial_overlap_matrix
+from shortest_path_opt.shortest_path import ShortestPath
 
 
 STATE_NUM = 50
@@ -157,6 +158,9 @@ ax.figure.savefig(figure_path / f"Ising_overlap_matrix_{STATE_NUM}_{N_STEPS}_{N}
 # plt.show()
 
 opt_target_num = 20
+min_cost, path_opt_seq = ShortestPath(org_u_nks).optimize(opt_target_num)
+print(f"ShortestPath min_cost: {min_cost} \nsolution_seq: {path_opt_seq}")
+
 partial_overlap_matrix = calc_partial_overlap_matrix(mbar_estimator)
 dp_optimizer = DPOptimizer(partial_overlap_matrix, org_overlap_matrix, opt_target_num)
 best_seq = []
@@ -179,7 +183,7 @@ for i in range(5):
         best_seq = solution_seq
 evenly_seq = [round(i) for i in np.linspace(0, STATE_NUM-1, opt_target_num)]
 
-for key, seq in {"evenly": evenly_seq, "opt": best_seq}.items():
+for key, seq in {"evenly": evenly_seq, "overlap_opt": best_seq, "path_opt": path_opt_seq}.items():
     plt.close("all")
     test_u_nks = []
     lc = -1
