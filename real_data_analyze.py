@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from alchemlyb.estimators import MBAR
 from util.real_data_handler import RealDataHandler
 from alchemlyb.visualisation import plot_mbar_overlap_matrix
-from util.dp_optimizer import DPOptimizer
+from util.dp_evenly_overlap import DPOptimizer
 from util.calc_partial_overlap import calc_partial_overlap_matrix
 
 fig_path = Path("./figures")

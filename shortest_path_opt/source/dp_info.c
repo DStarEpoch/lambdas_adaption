@@ -1,24 +1,3 @@
-#ifndef PY_SSIZE_T_CLEAN
-#define PY_SSIZE_T_CLEAN
-#endif /* PY_SSIZE_T_CLEAN */
-
-#include "Python.h"
-#ifndef Py_PYTHON_H
-    #error Python headers needed to compile C extensions, please install development version of Python.
-#elif PY_VERSION_HEX < 0x02060000 || (0x03000000 <= PY_VERSION_HEX && PY_VERSION_HEX < 0x03030000)
-    #error Cython requires Python 2.6+ or Python 3.3+.
-#endif
-
-#include "structmember.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-
-#include <stddef.h>
-#ifndef offsetof
-  #define offsetof(type, member) ( (size_t) & ((type*)0) -> member )
-#endif
-
 #include "dp_info.h"
 
 int getDPInfoSequenceLength(DPInfo *self) {
@@ -63,7 +42,6 @@ void initDPInfo(DPInfo *self, int latest_insert_idx) {
 void freeDPInfo(DPInfo *self) {
     if (self == NULL)
         return;
-    freeDPInfo(self->parent);
     free(self);
 }
 
@@ -73,12 +51,7 @@ DPInfo *newDPInfo(int latest_insert_idx) {
     return ret;
 }
 
-// 封装DPInfo为Python对象
-typedef struct _DPInfoObject{
-    PyObject_HEAD
-    DPInfo *dp_info;
-} DPInfoObject;
-
+// 实现封装DPInfo为Python对象方法
 static void
 DPInfo_dealloc(DPInfoObject *self)
 {
@@ -178,13 +151,13 @@ DPInfo_setParent(DPInfoObject *self, PyObject *args, PyObject *kwds)
 
 static PyMethodDef DPInfo_methods[] = {
     {"setParent", (PyCFunction)DPInfo_setParent, METH_VARARGS | METH_KEYWORDS,
-    "setParent(parent: dp_info.DPInfo)\n"},
+    "setParent(parent: dp_optimizer.DPInfo)\n"},
     {NULL}  /* Sentinel */
 };
 
-static PyTypeObject DPInfoType = {
+PyTypeObject DPInfoType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "dp_info.DPInfo",
+    .tp_name = "dp_optimizer.DPInfo",
     .tp_basicsize = sizeof(DPInfoObject),
     .tp_itemsize = 0,
     .tp_dealloc = (destructor)DPInfo_dealloc,
@@ -197,29 +170,4 @@ static PyTypeObject DPInfoType = {
     .tp_init = (initproc)DPInfo_init,
     .tp_new = DPInfo_new,
 };
-
-static PyModuleDef DPInfoModule = {
-    PyModuleDef_HEAD_INIT,
-    "dp_info",
-    "Dynamic Programming Node Info",
-    -1,
-    NULL, NULL, NULL, NULL, NULL
-};
-
-PyMODINIT_FUNC
-PyInit_dp_info(void)
-{
-    PyObject *m;
-    if (PyType_Ready(&DPInfoType) < 0)
-        return NULL;
-
-    m = PyModule_Create(&DPInfoModule);
-    if (m == NULL)
-        return NULL;
-
-    Py_INCREF(&DPInfoType);
-    PyModule_AddObject(m, "DPInfo", (PyObject *) &DPInfoType);
-    return m;
-}
-
 // 封装结束

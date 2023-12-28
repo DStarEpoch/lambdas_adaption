@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from alchemlyb.estimators import MBAR
 from alchemlyb.visualisation import plot_mbar_overlap_matrix
 from util.fit_curve import BezierCurve
-from util.dp_optimizer import DPOptimizer
+from util.dp_evenly_overlap import DPOptimizer
 from util.calc_partial_overlap import calc_partial_overlap_matrix
 from shortest_path_opt.shortest_path import ShortestPath
 
