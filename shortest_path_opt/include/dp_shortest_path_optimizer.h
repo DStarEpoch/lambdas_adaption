@@ -1,4 +1,6 @@
-#pragma once
+#ifndef DP_SHORTEST_PATH_OPTIMIZER_H
+#define DP_SHORTEST_PATH_OPTIMIZER_H
+
 #ifndef PY_SSIZE_T_CLEAN
 #define PY_SSIZE_T_CLEAN
 #endif /* PY_SSIZE_T_CLEAN */
@@ -28,5 +30,7 @@ typedef struct _DPShortestPathOptimizer {
     int retain_lambda_idx_size;
 }DPShortestPathOptimizer;
 
-PyTypeObject DPShortestPathOptimizerType;
 
+extern PyTypeObject DPShortestPathOptimizerType;
+
+#endif

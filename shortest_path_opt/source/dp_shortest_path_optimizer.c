@@ -1,16 +1,16 @@
 #include "dp_info.h"
 #include "dp_shortest_path_optimizer.h"
 
-#define ITEM_IN_LIST(list, item, size) ({ \
-    int _ret = 0; \
-    for (int _i = 0; _i < size; _i++) { \
-        if (list[_i] == item) { \
-            _ret = 1; \
-            break; \
-        } \
-    } \
-    _ret; \
-})
+int ITEM_IN_LIST(int* list, int item, int size) {
+    int _ret = 0;
+    for (int _i = 0; _i < size; _i++) {
+        if (list[_i] == item) {
+            _ret = 1;
+            break;
+        }
+    }
+    return _ret;
+}
 
 
 static void

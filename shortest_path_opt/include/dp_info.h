@@ -1,4 +1,6 @@
-#pragma once
+#ifndef DP_INFO_H
+#define DP_INFO_H
+
 #ifndef PY_SSIZE_T_CLEAN
 #define PY_SSIZE_T_CLEAN
 #endif /* PY_SSIZE_T_CLEAN */
@@ -47,5 +49,6 @@ void freeDPInfo(DPInfo *self);
 
 DPInfo* newDPInfo(int latest_insert_idx);
 
-PyTypeObject DPInfoType;
+extern PyTypeObject DPInfoType;
 
+#endif
