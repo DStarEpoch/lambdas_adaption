@@ -58,14 +58,14 @@ class RealDataHandler:
         return H
 
 
-def real_data_test(directory: str, temperature=310, target_lambda_num=20):
+def real_data_test(directory: str, temperature=310, target_lambda_num=32):
     import time
     from shortest_path_opt.shortest_path import ShortestPath
     handler = RealDataHandler.get_files_from_directory(directory=directory, temperature=temperature)
     dp_shortest_path = ShortestPath(handler.u_nks)
     start_t = time.time()
     min_cost, optimal_sequence = dp_shortest_path.optimize(target_lambda_num=target_lambda_num,
-                                                           retain_lambda_idx=[0, 1, 2, 3, 4, 5, 6, 7])
+                                                           retain_lambda_idx=list(range(8)))
     end_t = time.time()
     print(f"min_cost: {min_cost} time: {end_t-start_t}\noptimal_sequence: {optimal_sequence}")
 

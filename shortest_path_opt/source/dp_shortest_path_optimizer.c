@@ -134,12 +134,16 @@ DPShortestPathOptimizer_optimize(DPShortestPathOptimizer *self, PyObject *args, 
 
     if (target_lambda_num <= self->retain_lambda_idx_size)
     {
+        double min_cost = 0.0;
         PyObject *list = PyList_New(self->retain_lambda_idx_size);
         for (int i = 0; i < self->retain_lambda_idx_size; i++)
         {
             PyList_SetItem(list, i, PyLong_FromLong(self->retain_lambda_idx[i]));
+            if (i > 0) {
+                min_cost += self->distance_matrix[self->retain_lambda_idx[i - 1]][self->retain_lambda_idx[i]];
+            }
         }
-        return Py_BuildValue("fO", 0.0, list);
+        return Py_BuildValue("fO", min_cost, list);
     }
 
     int n = self->distance_matrix_size;

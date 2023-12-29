@@ -12,10 +12,10 @@ from alchemlyb.visualisation import plot_mbar_overlap_matrix
 
 warnings.filterwarnings("ignore")
 
-fig_path = Path("./figures")
+fig_path = Path("../figures")
 fig_path.mkdir(parents=True, exist_ok=True)
 
-system_output_path = Path("./real_data/ejm_31")
+system_output_path = Path("../real_data/ejm_31")
 sim_type = "abfe"
 org_u_nks = RealDataHandler.get_files_from_directory(directory=system_output_path / sim_type,
                                                      energy_file_name="prod_npt.csv").u_nks
