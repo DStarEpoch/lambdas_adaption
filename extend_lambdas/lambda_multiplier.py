@@ -1,15 +1,7 @@
 # -*- coding:utf-8 -*-
-import random
-import warnings
 import numpy as np
 import pandas as pd
 from typing import List, Tuple
-from pathlib import Path
-import matplotlib.pyplot as plt
-from collections import Counter
-from alchemlyb.estimators import MBAR
-from util.real_data_handler import RealDataHandler
-from alchemlyb.visualisation import plot_mbar_overlap_matrix
 from extend_lambdas.boltzmann_picking import BoltzmannPicking
 
 
@@ -30,8 +22,10 @@ class LambdaMultiplier(object):
     def extend(self, times: int = 1, insert_lambdas_info: List[Tuple[int, int, float]] = None):
         """
 
-        param times: each pair of adjacent lambdas evenly insert times new lambdas
-        :return:
+        param times: int, each pair of adjacent lambdas evenly insert times new lambdas
+        param insert_lambdas_info: List[Tuple[int, int, float]], list of insert lambda, format (start, end, ratio)
+        at least give one of times or insert_lambdas_info
+        :return: None
         """
 
         if insert_lambdas_info is None:
@@ -51,19 +45,19 @@ class LambdaMultiplier(object):
     def drop(self, interval: float = 1) -> List[Tuple[int, int, float]]:
         """
 
-        :param interval:
-        :return:
+        :param interval: float, drop lambdas by interval
+        :return: List[Tuple[int, int, float]], list of dropped lambdas info, format (start, end, ratio)
         """
         org_f_k = self.f_k
         remain_len = round((len(self.u_nks) - 1) / (interval + 1)) + 1
-        spacing = len(self.u_nks) * 1.0 / remain_len
+        spacing = (len(self.u_nks) - 1) * 1.0 / remain_len
 
         # decide which lambdas to remove
         remove_lambda_idx = list()
         remaining_lambdas = [0]
         for i in range(remain_len):
             target_position = round((i + 1) * spacing)
-            for j in range(remaining_lambdas[-1], target_position):
+            for j in range(remaining_lambdas[-1] + 1, target_position):
                 remove_lambda_idx.append(j)
             remaining_lambdas.append(target_position)
 
@@ -81,6 +75,7 @@ class LambdaMultiplier(object):
             u_k = u_k.set_index(['lambda', 'window'])
             remain_u_nks.append(u_k)
 
+        org_lambda_idx_to_new_lambda_idx = {v: i for i, v in enumerate(remaining_lambdas)}
         self._u_nks = remain_u_nks
         self._boltzmann_picking = BoltzmannPicking(org_u_nks=remain_u_nks, initial_f_k=remain_f_k)
         remove_lambdas_info = []
@@ -91,18 +86,9 @@ class LambdaMultiplier(object):
                     i_next = j
                     break
                 i_pre = j
-            remove_lambdas_info.append((i_pre, i_next, (i - i_pre) / (i_next - i_pre)))
+            ratio = (i - i_pre) / (i_next - i_pre)
+            i_pre = org_lambda_idx_to_new_lambda_idx[i_pre]
+            i_next = org_lambda_idx_to_new_lambda_idx[i_next]
+            remove_lambdas_info.append((i_pre, i_next, ratio))
 
         return remove_lambdas_info
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--directory", type=str, help="simulation data directory path which should"
-                                                            "contain path of windows of prod_npt.csv")
-    parser.add_argument("-i", "--interval", type=float, default=2)
-    parser.add_argument("-t", "--temperature", type=float, default=310)
-
-

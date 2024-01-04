@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+import tqdm
 import random
 import numpy as np
 import pandas as pd
@@ -52,27 +53,27 @@ class BoltzmannPicking(object):
         all_lambdas_info = self._arrangeLambdaInfo(insert_lambdas_info=insert_lambdas_info)
 
         samples_per_lambda = len(self.org_u_nks[0].iloc[:, 0])
-        base_u = [sum([np.exp(self.f_k[k] - np.asarray(self.org_u_nks[k].iloc[:, i]))
-                       for k in range(len(self.org_u_nks))])
-                  for i in range(len(self.org_u_nks))]
 
         # pre-compute free energy of inserted lambdas and picking list
         pick_tag_list_dict = dict()
-        all_u_samples_list = list()
-        for lambda_info in all_lambdas_info:
+        for lambda_info in tqdm.tqdm(all_lambdas_info, total=len(all_lambdas_info), desc="pre-compute free energy"):
             all_u_samples = dict()
             if not lambda_info.is_insert:
-                all_u_samples_list.append(all_u_samples)
                 continue
             ratio = lambda_info.ratio
             start_lambda_idx = lambda_info.start_lambda_idx
             end_lambda_idx = lambda_info.end_lambda_idx
             exp_f_insert = 0.0
             for o in range(len(self.org_u_nks)):
-                u = np.asarray(self.org_u_nks[o].iloc[:, start_lambda_idx]) * (1 - ratio) + \
-                    np.asarray(self.org_u_nks[o].iloc[:, end_lambda_idx]) * ratio
-                exp_f_insert += sum(np.exp(-u) / base_u[o]) / samples_per_lambda
-                all_u_samples[o] = u
+                exp_u_over_bias_list = []
+                for u_idx in range(samples_per_lambda):
+                    exp_u_over_bias = np.exp(-(np.asarray(self.org_u_nks[o].iloc[u_idx, start_lambda_idx]) * (1 - ratio)
+                                               + np.asarray(self.org_u_nks[o].iloc[u_idx, end_lambda_idx]) * ratio)) \
+                                      / np.sum([np.exp(self.f_k[k] - self.org_u_nks[o].iloc[u_idx, k])
+                                                for k in range(len(self.org_u_nks))])
+                    exp_u_over_bias_list.append(exp_u_over_bias / samples_per_lambda)
+                exp_f_insert += sum(exp_u_over_bias_list)
+                all_u_samples[o] = exp_u_over_bias_list
             f_insert = -np.log(exp_f_insert)
             lambda_info.f_k = f_insert
 
@@ -81,23 +82,19 @@ class BoltzmannPicking(object):
             for l_idx in all_u_samples:
                 u = all_u_samples[l_idx]
                 for u_idx in range(len(u)):
-                    bias = sum([np.exp(self.f_k[k] - np.asarray(self.org_u_nks[l_idx].iloc[:, k][u_idx]))
-                                for k in range(len(self.org_u_nks))])
-                    w_list.append(np.exp(f_insert - u[u_idx]) / (bias * samples_per_lambda))
+                    w_list.append(np.exp(f_insert + np.log(u[u_idx])))
                     tag_list.append((l_idx, u_idx))
 
-            all_u_samples_list.append(all_u_samples)
             pick_tag_list = random.choices(tag_list, weights=w_list, k=samples_per_lambda)
             pick_tag_list_dict[lambda_info.rank] = pick_tag_list
 
         # generate fake sampling for inserted lambda and reorder u_nks for all lambdas
         bp_u_nks = list()
         lc = -1
-        for i in range(len(all_lambdas_info)):
+        for i in tqdm.tqdm(range(len(all_lambdas_info)), total=len(all_lambdas_info), desc="generate fake sampling"):
             lc += 1
             u_nk = pd.DataFrame()
             cur_info = all_lambdas_info[i]
-            cur_pick_tag_list = pick_tag_list_dict[cur_info.rank]
 
             for iter_idx in range(len(all_lambdas_info)):
                 # l2->cur
@@ -119,6 +116,7 @@ class BoltzmannPicking(object):
                                                * iter_ratio
                                                for u_idx in range(samples_per_lambda)]
                 else:
+                    cur_pick_tag_list = pick_tag_list_dict[cur_info.rank]
                     if not iter_info.is_insert:
                         iter_org_idx = iter_info.org_idx
                         u_nk[str(iter_idx)] = [self.org_u_nks[l_idx][str(iter_org_idx)][u_idx]
