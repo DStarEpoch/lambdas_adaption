@@ -83,7 +83,7 @@ if __name__ == "__main__":
     plt.show()
 
     plt.close("all")
-    lambda_multiplier.extend(times=1, processes=1)
+    lambda_multiplier.extend(times=2, processes=1)
     shortest_path = ShortestPath(u_nks=lambda_multiplier.u_nks)
     min_cost, select_seq = shortest_path.optimize(target_lambda_num=len(handler.u_nks))
     print("select_seq: ", select_seq)
