@@ -1,8 +1,7 @@
 # -*- coding:utf-8 -*-
-import numpy as np
 import pandas as pd
 from typing import List, Tuple
-from extend_lambdas.boltzmann_picking import BoltzmannPicking
+from extend_lambdas.boltzmann_picking import BoltzmannPicking, LambdaInfoContext
 
 
 class LambdaMultiplier(object):
@@ -19,7 +18,7 @@ class LambdaMultiplier(object):
     def f_k(self):
         return self._boltzmann_picking.f_k
 
-    def extend(self, times: int = 1, insert_lambdas_info: List[Tuple[int, int, float]] = None):
+    def extend(self, times: int = 1, insert_lambdas_info: List[Tuple[int, int, float]] = None, processes=1):
         """
 
         param times: int, each pair of adjacent lambdas evenly insert times new lambdas
@@ -32,15 +31,16 @@ class LambdaMultiplier(object):
             insert_lambdas_info = []
             for i in range(len(self._u_nks) - 1):
                 for t in range(times):
-                    insert_lambdas_info.append((i, i+1, t*1.0 / (times + 1)))
+                    insert_lambdas_info.append((i, i+1, (t + 1)*1.0 / (times + 1)))
 
         bp_u_nks, new_lambdas_info = self._boltzmann_picking.genSamplesWithInsertLambda(
-            insert_lambdas_info=insert_lambdas_info
+            insert_lambdas_info=insert_lambdas_info,
+            processes=processes
         )
 
         self._u_nks = bp_u_nks
-        initial_f_k = [info.f_k for info in new_lambdas_info]
-        self._boltzmann_picking = BoltzmannPicking(org_u_nks=self._u_nks, initial_f_k=initial_f_k)
+        # initial_f_k = [info.f_k for info in new_lambdas_info]
+        # self._boltzmann_picking = BoltzmannPicking(org_u_nks=self._u_nks, initial_f_k=initial_f_k)
 
     def drop(self, interval: float = 1) -> List[Tuple[int, int, float]]:
         """
@@ -92,3 +92,8 @@ class LambdaMultiplier(object):
             remove_lambdas_info.append((i_pre, i_next, ratio))
 
         return remove_lambdas_info
+
+    def getLambdasInfo(self, lambda_idx_list: List[int]) -> List[LambdaInfoContext]:
+        org_lambdas_info = self._boltzmann_picking.org_lambdas_info
+        ret = [org_lambdas_info[i] for i in lambda_idx_list]
+        return ret

@@ -54,46 +54,4 @@ class ShortestPath(object):
         optimizer = DPShortestPathOptimizer(self.distance_matrix, retain_lambda_idx)
         min_cost, solution_seq = optimizer.optimize(target_lambda_num)
 
-        # if target_lambda_num <= len(retain_lambda_idx):
-        #     cost = 0.0
-        #     return cost, retain_lambda_idx
-        #
-        # n = len(self.distance_matrix)
-        # m = target_lambda_num - len(retain_lambda_idx)
-        #
-        # # initialize DPInfo
-        # # dp[i][j][k]: optimal path from lambda_0 to lambda_i with j selected points and try to insert lambda_k
-        # dp = [[[DPInfo(k) for k in range(i + 1)] for _ in range(m)] for i in range(n)]
-        # # Initialize no selected points case
-        # for i in range(n):
-        #     for k in range(i + 1):
-        #         dp[i][0][k].cost = self.distance_matrix[0][k] + self.distance_matrix[k][i]
-        #
-        # # DP
-        # for i in range(n):
-        #     for j in range(1, m):
-        #         for k in range(i + 1):
-        #             if k in retain_lambda_idx:
-        #                 # skip retained lambdas
-        #                 continue
-        #             # Try selecting index k
-        #             for k_prime in range(k):
-        #                 if k_prime in retain_lambda_idx:
-        #                     continue
-        #                 new_cost = dp[k_prime][j - 1][k_prime].cost + \
-        #                            self.distance_matrix[k_prime][k] + self.distance_matrix[k][i]
-        #                 if dp[i][j][k].cost > new_cost:
-        #                     dp[i][j][k].cost = new_cost
-        #                     dp[i][j][k].setParent(dp[k_prime][j - 1][k_prime])
-        #
-        # # find min cost
-        # min_cost = float('inf')
-        # solution_seq = None
-        # for k in range(n):
-        #     if dp[n - 1][m - 1][k].cost < min_cost:
-        #         min_cost = dp[n - 1][m - 1][k].cost
-        #         solution_seq = dp[n - 1][m - 1][k].sequence
-        # solution_seq += retain_lambda_idx
-        # solution_seq.sort()
-
         return min_cost, solution_seq
