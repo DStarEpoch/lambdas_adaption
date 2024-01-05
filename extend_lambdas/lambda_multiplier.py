@@ -39,8 +39,8 @@ class LambdaMultiplier(object):
         )
 
         self._u_nks = bp_u_nks
-        # initial_f_k = [info.f_k for info in new_lambdas_info]
-        # self._boltzmann_picking = BoltzmannPicking(org_u_nks=self._u_nks, initial_f_k=initial_f_k)
+        initial_f_k = [info.f_k for info in new_lambdas_info]
+        self._boltzmann_picking = BoltzmannPicking(org_u_nks=self._u_nks, initial_f_k=initial_f_k)
 
     def drop(self, interval: float = 1) -> List[Tuple[int, int, float]]:
         """

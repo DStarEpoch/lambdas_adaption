@@ -87,10 +87,6 @@ if __name__ == "__main__":
     shortest_path = ShortestPath(u_nks=lambda_multiplier.u_nks)
     min_cost, select_seq = shortest_path.optimize(target_lambda_num=len(handler.u_nks))
     print("select_seq: ", select_seq)
-    print("select_lambda_info:")
-    for info in lambda_multiplier.getLambdasInfo(select_seq):
-        print(str(info), end="\t")
-    print()
     new_u_nks = selectFromUNKS(lambda_multiplier.u_nks, select_seq)
     mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in new_u_nks]))
     plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)

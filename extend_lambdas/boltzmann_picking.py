@@ -35,10 +35,10 @@ class LambdaInfoContext(object):
 class CollectPickTagsContext(object):
     idx: int
     cur_lambda_info: LambdaInfoContext
-    org_u_nks: List[pd.DataFrame]
+    org_u_nks: List[List[List[float]]]
     f_k: List[float]
 
-    def __init__(self, idx: int, cur_lambda_info: LambdaInfoContext, org_u_nks: List[pd.DataFrame], f_k: List[float]):
+    def __init__(self, idx: int, cur_lambda_info: LambdaInfoContext, org_u_nks: List[List[List[float]]], f_k: List[float]):
         self.idx = idx
         self.cur_lambda_info = cur_lambda_info
         self.org_u_nks = org_u_nks
@@ -52,7 +52,7 @@ def parallelCollectPickTags(context: CollectPickTagsContext) -> Dict[str, Union[
     context_idx = context.idx
     ret = {"idx": context_idx, "rank": lambda_info.rank, "lambda_info": lambda_info}
 
-    samples_per_lambda = len(org_u_nks[0].iloc[:, 0])
+    samples_per_lambda = len(org_u_nks[0][0])
     if not lambda_info.is_insert:
         ret["pick_tag_list"] = None
         return ret
@@ -64,10 +64,10 @@ def parallelCollectPickTags(context: CollectPickTagsContext) -> Dict[str, Union[
     for o in range(len(org_u_nks)):
         p_over_bias_list = []
         for u_idx in range(samples_per_lambda):
-            p_over_bias = np.exp(-(np.asarray(org_u_nks[o].iloc[u_idx, start_lambda_idx]) * (1 - ratio)
-                                       + np.asarray(org_u_nks[o].iloc[u_idx, end_lambda_idx]) * ratio)) \
-                              / np.sum([np.exp(f_k[k] - org_u_nks[o].iloc[u_idx, k])
-                                        for k in range(len(org_u_nks))])
+            p_over_bias = np.exp(-(org_u_nks[o][start_lambda_idx][u_idx] * (1 - ratio)
+                                   + org_u_nks[o][end_lambda_idx][u_idx] * ratio)) \
+                          / np.sum([np.exp(f_k[k] - org_u_nks[o][k][u_idx])
+                                    for k in range(len(org_u_nks))])
             p_over_bias_list.append(p_over_bias / samples_per_lambda)
         sum_p += sum(p_over_bias_list)
         all_u_samples[o] = p_over_bias_list
@@ -92,6 +92,7 @@ class BoltzmannPicking(object):
 
     def __init__(self, org_u_nks: List[pd.DataFrame], initial_f_k: List[float] = None):
         self.org_u_nks = org_u_nks
+        self.list_u_nks: List[List[List[float]]] = [org_u_nk.transpose().values.tolist() for org_u_nk in org_u_nks]
 
         if initial_f_k is None:
             mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat(org_u_nks))
@@ -113,12 +114,13 @@ class BoltzmannPicking(object):
 
         # pre-compute free energy of inserted lambdas and picking list
         pick_tag_list_dict: Dict[float, List[int]] = dict()
-        params = [CollectPickTagsContext(idx=idx, cur_lambda_info=info, org_u_nks=self.org_u_nks, f_k=self.f_k)
+        params = [CollectPickTagsContext(idx=idx, cur_lambda_info=info, org_u_nks=self.list_u_nks, f_k=self.f_k)
                   for idx, info in enumerate(all_lambdas_info)]
         if processes > 1:
             with Pool(processes) as pool:
                 result = list(tqdm.tqdm(pool.imap(parallelCollectPickTags, params),
                                         total=len(params), desc="pre-compute free energy"))
+                # result = pool.map(parallelCollectPickTags, params)
                 for r in result:
                     if r["pick_tag_list"] is None:
                         continue
