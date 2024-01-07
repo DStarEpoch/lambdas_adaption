@@ -24,12 +24,11 @@
 #include "math.h"
 #include "lambda_info_context.h"
 
-typedef struct _SampleGenerator {
+typedef struct _SampleGeneratorObject {
     PyObject_HEAD
-    double **distance_matrix;
-    int distance_matrix_size;
-    int *retain_lambda_idx;
-    int retain_lambda_idx_size;
-}SampleGenerator;
+    long lambda_num;
+    long samples_per_lambda;
+    double *org_u_nks;
+}SampleGeneratorObject;
 
 #endif
