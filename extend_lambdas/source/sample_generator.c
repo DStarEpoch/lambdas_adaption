@@ -77,30 +77,35 @@ SampleGeneratorObject_get_org_u_nks(SampleGeneratorObject *self, void *closure)
 }
 
 static PyObject *
-SampleGeneratorObject_genSamplesWithInsertLambda(SampleGeneratorObject *self, PyObject *args, PyObject *kwds)
+SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"insert_lambdas_info", NULL};
+    static char *kwlist[] = {"all_lambdas_info", NULL};
 
-    PyObject *insert_lambdas_info;
+    PyObject *all_lambdas_info;
 
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &insert_lambdas_info)) {
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &all_lambdas_info)) {
         return NULL;
     }
 
-    if (!PyList_Check(insert_lambdas_info)) {
-        PyErr_SetString(PyExc_TypeError, "insert_lambdas_info must be list");
+    if (!PyList_Check(all_lambdas_info)) {
+        PyErr_SetString(PyExc_TypeError, "all_lambdas_info must be list");
         return NULL;
     }
 
-    time_t t;
-    srand((unsigned) time(&t));
-
-    Py_ssize_t insert_lambdas_size = PyList_Size(insert_lambdas_info);
-    printf("insert_lambdas_size: %ld\n rand: %d\n rand_max: %d\n",
-    insert_lambdas_size, rand(), RAND_MAX);
+    Py_ssize_t all_lambdas_size = PyList_Size(all_lambdas_info);
+    printf("all_lambdas_size: %ld\n rand: %d\n rand_max: %d\n",
+    all_lambdas_size, rand(), RAND_MAX);
 
     // pre-compute free energy of inserted lambdas and picking list
+    PyObject* pick_tag_list_dict = PyDict_New();
+    for (Py_ssize_t i = 0; i < all_lambdas_size; i++) {
+        LambdaInfoContextObject* cur_lambda_info = (LambdaInfoContextObject *)PyList_GetItem(all_lambdas_info, i);
+        printf("lambda_idx: %ld, rank: %f", i, cur_lambda_info->context->getRank(cur_lambda_info->context));
+    }
 
+    // generate fake sampling for inserted lambda and reorder u_nks for all lambdas
+    time_t t;
+    srand((unsigned) time(&t));
 
     Py_RETURN_NONE;
 }
@@ -119,10 +124,10 @@ static PyMemberDef SampleGeneratorObject_members[] = {
 };
 
 static PyMethodDef SampleGeneratorObject_methods[] = {
-    {"genSamplesWithInsertLambda",
-    (PyCFunction)SampleGeneratorObject_genSamplesWithInsertLambda,
+    {"genSamplesForInsertLambda",
+    (PyCFunction)SampleGeneratorObject_genSamplesForInsertLambda,
     METH_VARARGS | METH_KEYWORDS,
-     "genSamplesWithInsertLambda(insert_lambdas_info: List[Tuple[int, int, float]]) -> Tuple[bp_u_nks, all_lambdas_info]"},
+     "genSamplesForInsertLambda(all_lambdas_info: List[LambdaInfoContext]) -> Tuple[bp_u_nks, all_lambdas_info]"},
     {NULL}  /* Sentinel */
 };
 
