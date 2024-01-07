@@ -22,6 +22,7 @@
   #define offsetof(type, member) ( (size_t) & ((type*)0) -> member )
 #endif
 #include "math.h"
+#include "lambda_info_context.h"
 
 typedef struct _SampleGenerator {
     PyObject_HEAD

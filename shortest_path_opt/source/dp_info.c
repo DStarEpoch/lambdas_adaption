@@ -89,11 +89,18 @@ DPInfo_get_cost(DPInfoObject *self, void *closure)
 static PyObject *
 DPInfo_set_cost(DPInfoObject *self, PyObject *value, void *closure)
 {
-    double cost;
-    if (!PyArg_ParseTuple(value, "d", &cost))
-        return NULL;
-    self->dp_info->cost = cost;
-    return 0;
+    if (PyFloat_Check(value)) {
+        self->dp_info->cost = PyFloat_AsDouble(value);
+        return 0;
+    }
+
+    if (PyLong_Check(value)) {
+        self->dp_info->cost = PyLong_AsDouble(value);
+        return 0;
+    }
+
+    PyErr_SetString(PyExc_TypeError, "cost must be set as a float or int");
+    return NULL;
 }
 
 static PyObject *

@@ -92,6 +92,7 @@ class BoltzmannPicking(object):
 
     def __init__(self, org_u_nks: List[pd.DataFrame], initial_f_k: List[float] = None):
         self.org_u_nks = org_u_nks
+        self._org_lambdas_info = [LambdaInfoContext(i, i, 0.0, False, i, self.f_k[i]) for i in range(len(self.org_u_nks))]
         self.list_u_nks: List[List[List[float]]] = [org_u_nk.transpose().values.tolist() for org_u_nk in org_u_nks]
 
         if initial_f_k is None:
@@ -104,7 +105,7 @@ class BoltzmannPicking(object):
 
     @property
     def org_lambdas_info(self) -> List[LambdaInfoContext]:
-        return [LambdaInfoContext(i, i, 0.0, False, i, self.f_k[i]) for i in range(len(self.org_u_nks))]
+        return self._org_lambdas_info
 
     def genSamplesWithInsertLambda(self, insert_lambdas_info: List[Tuple[int, int, float]], processes: int = 1) \
             -> Tuple[List[pd.DataFrame], List[LambdaInfoContext]]:
