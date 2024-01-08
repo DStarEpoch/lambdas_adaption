@@ -8,8 +8,8 @@ double getRank(LambdaInfoContext *self) {
 }
 
 char* getStr(LambdaInfoContext *self) {
-    static char name[10];
-    strcpy(name, "1111test");
+    static char name[32];
+    sprintf(name, "%ld-%.2lf-%ld", self->start_lambda_idx, self->ratio, self->end_lambda_idx);
     return name;
 }
 
@@ -150,7 +150,7 @@ LambdaInfoContext_get_properties(LambdaInfoContextObject *self, void *closure)
 {
     PyObject *list = PyList_New(6);
     if (list == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "Could not allocate memory for distance_matrix");
+        PyErr_SetString(PyExc_MemoryError, "Could not allocate memory for properties");
         return NULL;
     }
 
@@ -190,8 +190,10 @@ LambdaInfoContext_createFromProperties(PyTypeObject *cls, PyObject *args)
     // classmethod
     PyObject *properties;
 
-    if (! PyArg_ParseTuple(args, "O", &properties))
+    if (! PyArg_ParseTuple(args, "O", &properties)) {
+        PyErr_SetString(PyExc_TypeError, "createFromProperties| cannot parse args!");
         return NULL;
+    }
 
     if (! PyList_Check(properties)) {
         PyErr_SetString(PyExc_TypeError, "Argument must be a list");
@@ -206,9 +208,11 @@ LambdaInfoContext_createFromProperties(PyTypeObject *cls, PyObject *args)
     LambdaInfoContextObject *self = (LambdaInfoContextObject *)PyObject_CallObject((PyObject *)cls, PyList_AsTuple(properties));
 
     if (self == NULL) {
+        PyErr_SetString(PyExc_ValueError, "create LambdaInfoContextObject failed!");
         return NULL;
     }
 
+    Py_INCREF(self);
     return (PyObject *)self;
 }
 
@@ -235,3 +239,30 @@ PyTypeObject LambdaInfoContextObjectType = {
     .tp_new = LambdaInfoContext_new,
 };
 
+LambdaInfoContextObject *
+createLambdaInfoContextObjFromArgs(long start_lambda_idx, long end_lambda_idx, double ratio, int is_insert, long org_idx, double f_k)
+{
+    PyObject *args = PyList_New(6);
+    if (args == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "Could not allocate memory for creating LambdaInfoContext Obj args");
+        return NULL;
+    }
+
+    PyList_SET_ITEM(args, 0, PyLong_FromLong(start_lambda_idx));
+    PyList_SET_ITEM(args, 1, PyLong_FromLong(end_lambda_idx));
+    PyList_SET_ITEM(args, 2, PyFloat_FromDouble(ratio));
+    PyList_SET_ITEM(args, 3, is_insert ? Py_True: Py_False);
+    PyList_SET_ITEM(args, 4, PyLong_FromLong(org_idx));
+    PyList_SET_ITEM(args, 5, PyFloat_FromDouble(f_k));
+
+    PyObject* args_tuple = PyTuple_New(1);
+    PyTuple_SetItem(args_tuple, 0, args);
+
+    LambdaInfoContextObject *op;
+    op = (LambdaInfoContextObject *)LambdaInfoContext_createFromProperties(&LambdaInfoContextObjectType, args_tuple);
+    if (op == NULL) {
+        PyErr_SetString(PyExc_ValueError, "createLambdaInfoContextObjFromArgs failed!");
+        return NULL;
+    }
+    return (LambdaInfoContextObject *)op;
+}

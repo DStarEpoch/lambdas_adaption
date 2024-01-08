@@ -39,13 +39,14 @@ typedef struct _LambdaInfoContextObject{
 
 void initLambdaInfoContext(LambdaInfoContext *self, long start_lambda_idx, long end_lambda_idx, double ratio, int is_insert, long org_idx, double f_k);
 void freeLambdaInfoContext(LambdaInfoContext *self);
-char* getStr(LambdaInfoContext *self);
-
-double getRank(LambdaInfoContext *self);
+extern char* getStr(LambdaInfoContext *self);
+extern double getRank(LambdaInfoContext *self);
 
 LambdaInfoContext* newLambdaInfoContext(long start_lambda_idx, long end_lambda_idx, double ratio, int is_insert, long org_idx, double f_k);
 
 extern PyTypeObject LambdaInfoContextObjectType;
 extern PyObject* LambdaInfoContext_createFromProperties(PyTypeObject *cls, PyObject *args);
+
+extern LambdaInfoContextObject* createLambdaInfoContextObjFromArgs(long start_lambda_idx, long end_lambda_idx, double ratio, int is_insert, long org_idx, double f_k);
 
 #endif
