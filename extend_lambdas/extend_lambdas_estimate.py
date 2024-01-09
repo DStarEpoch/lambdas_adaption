@@ -5,7 +5,14 @@ from typing import List
 
 
 def FrobeniusNorm(m1: np.matrix, m2: np.matrix):
-    return np.sqrt(np.trace(np.dot(m1, m2.T)))
+    return np.sqrt(abs(np.trace(np.dot(m1, m2.T))))
+
+
+def matrixFidelity(org_m: np.matrix, eval_m: np.matrix):
+    org_norm = FrobeniusNorm(org_m, org_m)
+    d_m = eval_m - org_m
+    delta_norm = FrobeniusNorm(d_m, org_m)
+    return (org_norm - delta_norm) / org_norm
 
 
 def selectFromUNKS(u_nks: List[pd.DataFrame], select_lambdas_idx: List[int]) -> List[pd.DataFrame]:
@@ -45,49 +52,49 @@ if __name__ == "__main__":
     handler = RealDataHandler.get_files_from_directory(directory=args.directory, temperature=args.temperature)
     lambda_multiplier = LambdaMultiplier(org_u_nks=handler.u_nks)
 
-    # org_f_k = copy(lambda_multiplier.f_k)
-    # org_distance_matrix = DistanceBuilder(u_nks=handler.u_nks).distance_matrix
-    # org_exp_m = np.asmatrix(np.exp(-np.asarray(org_distance_matrix)))
-    # print("\n org_Frobenius_norm: ", FrobeniusNorm(org_exp_m, org_exp_m))
-    # f_k_list = [["org_f_k", org_f_k]]
-    # matrix_distance_list = []
-    # for gap in range(1, 9):
-    #     lambda_multiplier = LambdaMultiplier(org_u_nks=handler.u_nks)
-    #     remove_info = lambda_multiplier.drop(gap)
-    #     lambda_multiplier.extend(insert_lambdas_info=remove_info, processes=3)
-    #     new_f_k = copy(lambda_multiplier.f_k)
-    #     f_k_list.append([f"est_f_k_{gap}", new_f_k])
-    #     new_distance_matrix = DistanceBuilder(u_nks=lambda_multiplier.u_nks).distance_matrix
-    #     d_exp_m = np.asmatrix(np.exp(-np.asarray(new_distance_matrix)) - np.exp(-np.asarray(org_distance_matrix)))
-    #     matrix_distance = FrobeniusNorm(d_exp_m, d_exp_m)
-    #     matrix_distance_list.append((gap, matrix_distance))
-    #     print(f"interval: {gap}, matrix_distance: {matrix_distance}")
-    #
-    # color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
-    # c = -1
-    # for k, v in f_k_list:
-    #     c += 1
-    #     plt.plot(v, label=k, color=color_list[c % len(color_list)])
-    # plt.gca().set(title='Free energy estimation', ylabel='F')
-    # plt.legend()
-    # plt.show()
-    #
-    # plt.close("all")
-    # matrix_distance_list = np.asarray(matrix_distance_list)
-    # plt.plot(matrix_distance_list[:, 0], matrix_distance_list[:, 1])
-    # plt.gca().set(title='Matrix distance', ylabel='distance', xlabel="interval")
-    # plt.show()
+    org_f_k = copy(lambda_multiplier.f_k)
+    org_distance_matrix = DistanceBuilder(u_nks=handler.u_nks).distance_matrix
+    org_exp_m = np.asmatrix(np.exp(-np.asarray(org_distance_matrix)))
+    f_k_list = [["org_f_k", org_f_k]]
+    fidelity_list = []
+    for gap in range(1, 9):
+        lambda_multiplier = LambdaMultiplier(org_u_nks=handler.u_nks)
+        remove_info = lambda_multiplier.drop(gap)
+        lambda_multiplier.extend(insert_lambdas_info=remove_info)
+        new_f_k = copy(lambda_multiplier.f_k)
+        f_k_list.append([f"est_f_k_{gap}", new_f_k])
+        new_distance_matrix = DistanceBuilder(u_nks=lambda_multiplier.u_nks).distance_matrix
+        new_distance_matrix = np.asmatrix(np.exp(-np.asarray(new_distance_matrix)))
 
-    mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in handler.u_nks]))
-    plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
+        fidelity = matrixFidelity(new_distance_matrix, org_exp_m)
+        fidelity_list.append((gap, fidelity))
+        print(f"interval: {gap}, fidelity: {fidelity}")
+
+    color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
+    c = -1
+    for k, v in f_k_list:
+        c += 1
+        plt.plot(v, label=k, color=color_list[c % len(color_list)])
+    plt.gca().set(title='Free energy estimation', ylabel='F')
+    plt.legend()
     plt.show()
 
     plt.close("all")
-    lambda_multiplier.extend(times=2, processes=1)
-    shortest_path = ShortestPath(u_nks=lambda_multiplier.u_nks)
-    min_cost, select_seq = shortest_path.optimize(target_lambda_num=len(handler.u_nks))
-    print("select_seq: ", select_seq)
-    new_u_nks = selectFromUNKS(lambda_multiplier.u_nks, select_seq)
-    mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in new_u_nks]))
-    plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
+    fidelity_list = np.asarray(fidelity_list)
+    plt.plot(fidelity_list[:, 0], fidelity_list[:, 1])
+    plt.gca().set(title='Matrix distance', ylabel='distance', xlabel="interval")
     plt.show()
+
+    # mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in handler.u_nks]))
+    # plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
+    # plt.show()
+    # plt.close("all")
+    #
+    # lambda_multiplier.extend(times=2)
+    # shortest_path = ShortestPath(u_nks=lambda_multiplier.u_nks)
+    # min_cost, select_seq = shortest_path.optimize(target_lambda_num=len(handler.u_nks))
+    # print("select_seq: ", select_seq)
+    # new_u_nks = selectFromUNKS(lambda_multiplier.u_nks, select_seq)
+    # mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in new_u_nks]))
+    # plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
+    # plt.show()

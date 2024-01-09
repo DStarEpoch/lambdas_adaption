@@ -92,8 +92,6 @@ class BoltzmannPicking(object):
 
     def __init__(self, org_u_nks: List[pd.DataFrame], initial_f_k: List[float] = None):
         self.org_u_nks = org_u_nks
-        self._org_lambdas_info = [LambdaInfoContext(i, i, 0.0, False, i, self.f_k[i]) for i in range(len(self.org_u_nks))]
-        self.list_u_nks: List[List[List[float]]] = [org_u_nk.transpose().values.tolist() for org_u_nk in org_u_nks]
 
         if initial_f_k is None:
             mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat(org_u_nks))
@@ -102,20 +100,21 @@ class BoltzmannPicking(object):
                 self.f_k.append(mbar_estimator.delta_f_.iloc[i, i + 1] + self.f_k[i])
         else:
             self.f_k = [initial_f_k[i] for i in range(len(org_u_nks))]
+        self._org_lambdas_info = [LambdaInfoContext(i, i, 0.0, False, i, self.f_k[i]) for i in range(len(self.org_u_nks))]
 
     @property
     def org_lambdas_info(self) -> List[LambdaInfoContext]:
         return self._org_lambdas_info
 
-    def genSamplesWithInsertLambda(self, insert_lambdas_info: List[Tuple[int, int, float]], processes: int = 1) \
+    def genSamplesWithInsertLambda(self, insert_lambdas_pos: List[Tuple[int, int, float]], processes: int = 1) \
             -> Tuple[List[pd.DataFrame], List[LambdaInfoContext]]:
-        all_lambdas_info = self._arrangeLambdaInfo(insert_lambdas_info=insert_lambdas_info)
-
+        all_lambdas_info = self._arrangeLambdaInfo(insert_lambdas_pos=insert_lambdas_pos)
+        list_u_nks: List[List[List[float]]] = [org_u_nk.transpose().values.tolist() for org_u_nk in self.org_u_nks]
         samples_per_lambda = len(self.org_u_nks[0].iloc[:, 0])
 
         # pre-compute free energy of inserted lambdas and picking list
         pick_tag_list_dict: Dict[float, List[int]] = dict()
-        params = [CollectPickTagsContext(idx=idx, cur_lambda_info=info, org_u_nks=self.list_u_nks, f_k=self.f_k)
+        params = [CollectPickTagsContext(idx=idx, cur_lambda_info=info, org_u_nks=list_u_nks, f_k=self.f_k)
                   for idx, info in enumerate(all_lambdas_info)]
         if processes > 1:
             with Pool(processes) as pool:
@@ -190,8 +189,8 @@ class BoltzmannPicking(object):
         self.f_k = [info.f_k for info in all_lambdas_info]
         return bp_u_nks, all_lambdas_info
 
-    def _arrangeLambdaInfo(self, insert_lambdas_info: List[Tuple[int, int, float]]) -> List[LambdaInfoContext]:
+    def _arrangeLambdaInfo(self, insert_lambdas_pos: List[Tuple[int, int, float]]) -> List[LambdaInfoContext]:
         all_lambdas_info = [LambdaInfoContext(info[0], info[1], info[2], True)
-                            for info in insert_lambdas_info] + self.org_lambdas_info
+                            for info in insert_lambdas_pos] + self.org_lambdas_info
         all_lambdas_info.sort(key=lambda x: x.rank)
         return all_lambdas_info

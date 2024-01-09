@@ -1,7 +1,9 @@
 # -*- coding:utf-8 -*-
 import pandas as pd
 from typing import List, Tuple
-from extend_lambdas.boltzmann_picking import BoltzmannPicking, LambdaInfoContext
+# from extend_lambdas.boltzmann_picking import BoltzmannPicking, LambdaInfoContext
+from sample_generator import LambdaInfoContext
+from extend_lambdas.boltzmann_picking_c import BoltzmannPicking
 
 
 class LambdaMultiplier(object):
@@ -18,7 +20,7 @@ class LambdaMultiplier(object):
     def f_k(self):
         return self._boltzmann_picking.f_k
 
-    def extend(self, times: int = 1, insert_lambdas_info: List[Tuple[int, int, float]] = None, processes=1):
+    def extend(self, times: int = 1, insert_lambdas_info: List[Tuple[int, int, float]] = None):
         """
 
         param times: int, each pair of adjacent lambdas evenly insert times new lambdas
@@ -34,8 +36,7 @@ class LambdaMultiplier(object):
                     insert_lambdas_info.append((i, i+1, (t + 1)*1.0 / (times + 1)))
 
         bp_u_nks, new_lambdas_info = self._boltzmann_picking.genSamplesWithInsertLambda(
-            insert_lambdas_info=insert_lambdas_info,
-            processes=processes
+            insert_lambdas_pos=insert_lambdas_info,
         )
 
         self._u_nks = bp_u_nks
