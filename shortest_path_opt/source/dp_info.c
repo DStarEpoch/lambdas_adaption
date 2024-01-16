@@ -1,23 +1,23 @@
 #include "dp_info.h"
 
-int getDPInfoSequenceLength(DPInfo *self) {
+long getDPInfoSequenceLength(DPInfo *self) {
     if (self == NULL)
         return 0;
-    int length = getDPInfoSequenceLength(self->parent) + 1;
+    long length = getDPInfoSequenceLength(self->parent) + 1;
     return length;
 }
 
-int *getDPInfoSequence(DPInfo *self) {
+long *getDPInfoSequence(DPInfo *self) {
     if (self == NULL)
         return NULL;
-    int seq_length = getDPInfoSequenceLength(self);
-    int *ret_list = (int *)malloc(sizeof(int) * seq_length);
+    long seq_length = getDPInfoSequenceLength(self);
+    long *ret_list = (long *)malloc(sizeof(long) * seq_length);
     if (self->parent == NULL) {
         ret_list[0] = self->latest_insert_idx;
         return ret_list;
     }
-    int *parent_seq = getDPInfoSequence(self->parent);
-    for (int i = 0; i < seq_length - 1; i++) {
+    long *parent_seq = getDPInfoSequence(self->parent);
+    for (long i = 0; i < seq_length - 1; i++) {
         ret_list[i] = parent_seq[i];
     }
     ret_list[seq_length - 1] = self->latest_insert_idx;
@@ -28,7 +28,7 @@ void setDPInfoParent(DPInfo *self, DPInfo *parent) {
     self->parent = parent;
 }
 
-void initDPInfo(DPInfo *self, int latest_insert_idx) {
+void initDPInfo(DPInfo *self, long latest_insert_idx) {
     self->parent = NULL;
     self->latest_insert_idx = latest_insert_idx;
     // init cost with infinity
@@ -43,9 +43,10 @@ void freeDPInfo(DPInfo *self) {
     if (self == NULL)
         return;
     free(self);
+    self = NULL;
 }
 
-DPInfo *newDPInfo(int latest_insert_idx) {
+DPInfo *newDPInfo(long latest_insert_idx) {
     DPInfo *ret = (DPInfo *)malloc(sizeof(DPInfo));
     initDPInfo(ret, latest_insert_idx);
     return ret;
@@ -55,7 +56,10 @@ DPInfo *newDPInfo(int latest_insert_idx) {
 static void
 DPInfo_dealloc(DPInfoObject *self)
 {
-    freeDPInfo(self->dp_info);
+    if (self->dp_info) {
+        freeDPInfo(self->dp_info);
+        self->dp_info = NULL;
+    }
     Py_TYPE(self)->tp_free((PyObject *) self);
 }
 
@@ -73,7 +77,7 @@ DPInfo_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 DPInfo_init(DPInfoObject *self, PyObject *args, PyObject *kwds)
 {
-    int latest_insert_idx;
+    long latest_insert_idx;
     if (!PyArg_ParseTuple(args, "i", &latest_insert_idx))
         return -1;
     self->dp_info = newDPInfo(latest_insert_idx);
@@ -112,13 +116,12 @@ DPInfo_get_latest_insert_idx(DPInfoObject *self, void *closure)
 static PyObject *
 DPInfo_get_sequence(DPInfoObject *self, void *closure)
 {
-    int *seq = self->dp_info->getSequence(self->dp_info);
-    int seq_length = self->dp_info->getSequenceLength(self->dp_info);
+    long *seq = self->dp_info->getSequence(self->dp_info);
+    long seq_length = self->dp_info->getSequenceLength(self->dp_info);
     PyObject *ret = PyList_New(seq_length);
-    for (int i = 0; i < seq_length; i++) {
+    for (long i = 0; i < seq_length; i++) {
         PyList_SetItem(ret, i, Py_BuildValue("i", seq[i]));
     }
-    free(seq);
     return ret;
 }
 

@@ -24,12 +24,4 @@
 #include "math.h"
 #include "lambda_info_context.h"
 
-typedef struct _SampleGeneratorObject {
-    PyObject_HEAD
-    long lambda_num;
-    long samples_per_lambda;
-    double *org_u_nks;
-    double *f_k;
-}SampleGeneratorObject;
-
 #endif

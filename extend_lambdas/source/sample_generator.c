@@ -1,112 +1,5 @@
 #include "sample_generator.h"
 
-// class SampleGenerator
-static void
-SampleGeneratorObject_dealloc(SampleGeneratorObject *self)
-{
-    Py_TYPE(self)->tp_free((PyObject *) self);
-}
-
-static PyObject *
-SampleGeneratorObject_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    SampleGeneratorObject *self;
-    self = (SampleGeneratorObject *) type->tp_alloc(type, 0);
-    if (self != NULL) {
-        self->lambda_num = 0;
-        self->samples_per_lambda = 0;
-        self->org_u_nks = NULL;
-        self->f_k = NULL;
-    }
-    return (PyObject *) self;
-}
-
-static int
-SampleGeneratorObject_init(SampleGeneratorObject *self, PyObject *args, PyObject *kwds)
-{
-    static char *kwlist[] = {"lambda_num", "samples_per_lambda", "org_u_nks", "f_k", NULL};
-
-    PyObject *org_u_nks;
-    PyObject *f_k;
-
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "llOO", kwlist,
-                                      &self->lambda_num, &self->samples_per_lambda,
-                                      &org_u_nks, &f_k))
-        return -1;
-
-    if (!PyList_Check(org_u_nks)) {
-        PyErr_SetString(PyExc_TypeError, "org_u_nks must be list");
-        return -1;
-    }
-
-    if (!PyList_Check(f_k)) {
-        PyErr_SetString(PyExc_TypeError, "f_k must be list");
-        return -1;
-    }
-
-    self->org_u_nks = malloc(self->lambda_num * self->lambda_num * self->samples_per_lambda * sizeof(double));
-    for (long i = 0; i < self->lambda_num; i++) {
-        PyObject *sample_from_lambda = PyList_GetItem(org_u_nks, i);
-        for (long j = 0; j < self->lambda_num; j++) {
-            PyObject *eval_potential_at_lambda = PyList_GetItem(sample_from_lambda, j);
-            for (long k=0; k < self->samples_per_lambda; k++) {
-                double potential = PyFloat_AsDouble(PyList_GetItem(eval_potential_at_lambda, k));
-                self->org_u_nks[i * (self->lambda_num * self->samples_per_lambda) + j * self->samples_per_lambda + k] = potential;
-            }
-        }
-    }
-
-    self->f_k = malloc(self->lambda_num * sizeof(double));
-    for (long i = 0; i < self->lambda_num; i++) {
-        double f = PyFloat_AsDouble(PyList_GetItem(f_k, i));
-        self->f_k[i] = f;
-    }
-
-    return 0;
-}
-
-static PyObject *
-SampleGeneratorObject_get_org_u_nks(SampleGeneratorObject *self, void *closure)
-{
-    PyObject *list = PyList_New(self->lambda_num);
-    if (list == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "Could not allocate memory for org_u_nks");
-        return NULL;
-    }
-
-    for (long i = 0; i < self->lambda_num; i++) {
-        PyObject *sample_from_lambda = PyList_New(self->lambda_num);
-        for (long j = 0; j < self->lambda_num; j++) {
-            PyObject *eval_potential_at_lambda = PyList_New(self->samples_per_lambda);
-            for (long k = 0; k < self->samples_per_lambda; k++) {
-                double potential = self->org_u_nks[i * (self->lambda_num * self->samples_per_lambda) + j * self->samples_per_lambda + k];
-                PyList_SET_ITEM(eval_potential_at_lambda, k, PyFloat_FromDouble(potential));
-            }
-            PyList_SET_ITEM(sample_from_lambda, j, eval_potential_at_lambda);
-        }
-        PyList_SET_ITEM(list, i, sample_from_lambda);
-    }
-
-    return Py_BuildValue("O", list);
-}
-
-static PyObject *
-SampleGeneratorObject_get_f_k(SampleGeneratorObject *self, void *closure)
-{
-    PyObject *list = PyList_New(self->lambda_num);
-    if (list == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "Could not allocate memory for f_k");
-        return NULL;
-    }
-
-    for (long k = 0; k < self->lambda_num; k++) {
-        double f = self->f_k[k];
-        PyList_SET_ITEM(list, k, PyFloat_FromDouble(f));
-    }
-
-    return Py_BuildValue("O", list);
-}
-
 typedef struct _PickTag {
     long lambda_idx;
     long sample_idx_at_lambda;
@@ -114,13 +7,14 @@ typedef struct _PickTag {
     double stop_weight;
 }PickTag;
 
-void insertContextInList(PyObject *all_lambdas_info, LambdaInfoContextObject *context_obj) {
+static void
+insertContextInList(PyObject *all_lambdas_info, LambdaInfoContextObject *context_obj) {
     if (!PyList_Check(all_lambdas_info)) {
         PyErr_SetString(PyExc_TypeError, "all_lambdas_info must be list");
         return;
     }
 
-    long list_size = PyList_Size(all_lambdas_info);
+    Py_ssize_t list_size = PyList_Size(all_lambdas_info);
     if (list_size < 1) {
         PyList_Append(all_lambdas_info, (PyObject *)context_obj);
         return;
@@ -141,14 +35,21 @@ void insertContextInList(PyObject *all_lambdas_info, LambdaInfoContextObject *co
     }
 }
 
-static PyObject *
-SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyObject *args, PyObject *kwds)
+// module sample_generator
+static PyObject*
+SampleGeneratorModule_genSamplesForInsertLambda(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"insert_lambdas_pos", NULL};
+    static char *kwlist[] = {"lambda_num", "samples_per_lambda", "org_u_nks",
+                            "f_k", "insert_lambdas_pos", NULL};
 
+    long lambda_num;
+    long samples_per_lambda;
+    PyObject *input_org_u_nks;
+    PyObject *input_f_k;
     PyObject *insert_lambdas_pos;
 
-    if (! PyArg_ParseTupleAndKeywords(args, kwds, "O", kwlist, &insert_lambdas_pos)) {
+    if (! PyArg_ParseTupleAndKeywords(args, kwds, "llOOO", kwlist, &lambda_num, &samples_per_lambda,
+    &input_org_u_nks, &input_f_k, &insert_lambdas_pos)) {
         return NULL;
     }
 
@@ -157,17 +58,35 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
         return NULL;
     }
 
+    double *org_u_nks = malloc(lambda_num * lambda_num * samples_per_lambda * sizeof(double));
+    for (long i = 0; i < lambda_num; i++) {
+        PyObject *sample_from_lambda = PyList_GetItem(input_org_u_nks, i);
+        for (long j = 0; j < lambda_num; j++) {
+            PyObject *eval_potential_at_lambda = PyList_GetItem(sample_from_lambda, j);
+            for (long k=0; k < samples_per_lambda; k++) {
+                double potential = PyFloat_AsDouble(PyList_GetItem(eval_potential_at_lambda, k));
+                org_u_nks[i * (lambda_num * samples_per_lambda) + j * samples_per_lambda + k] = potential;
+            }
+        }
+    }
+
+    double *f_k = malloc(lambda_num * sizeof(double));
+    for (long i = 0; i < lambda_num; i++) {
+        double f = PyFloat_AsDouble(PyList_GetItem(input_f_k, i));
+        f_k[i] = f;
+    }
+
     time_t t;
     srand((unsigned) time(&t));
 
-    long insert_lambdas_size = PyList_Size(insert_lambdas_pos);
-    PyObject *all_lambdas_info = PyList_New(self->lambda_num);
+    Py_ssize_t insert_lambdas_size = PyList_Size(insert_lambdas_pos);
+    PyObject *all_lambdas_info = PyList_New(lambda_num);
     PickTag* *pick_tags_list = (PickTag* *)malloc(sizeof(PickTag*) * insert_lambdas_size);
+//    PickTag pick_tags_list[insert_lambdas_size][samples_per_lambda];
     // init all_lambdas_info with exist lambdas
-    for (long i = 0; i < self->lambda_num; i++) {
-        LambdaInfoContextObject *op;
-        op = (LambdaInfoContextObject *)createLambdaInfoContextObjFromArgs(i, i, 0.0, 0, i, self->f_k[i]);
-        PyList_SET_ITEM(all_lambdas_info, i, (PyObject *)op);
+    for (long i = 0; i < lambda_num; i++) {
+        LambdaInfoContextObject *op = createLambdaInfoContextObjFromArgs(i, i, 0.0, 0, i, f_k[i]);
+        PyList_SetItem(all_lambdas_info, i, (PyObject *)op);
     }
 
     // pre-compute free energy of inserted lambdas and picking list
@@ -185,18 +104,18 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
             return NULL;
         }
 
-        if (start_lambda_idx < 0 || start_lambda_idx >= self->lambda_num) {
+        if (start_lambda_idx < 0 || start_lambda_idx >= lambda_num) {
             char err_msg[128];
             sprintf(err_msg, "start_lambda_idx=%ld at insert_lambdas_pos[%ld] is out of range [0, %ld] of org_u_nks\n",
-            start_lambda_idx, i, self->lambda_num);
+            start_lambda_idx, i, lambda_num);
             PyErr_SetString(PyExc_TypeError, err_msg);
             return NULL;
         }
 
-        if (end_lambda_idx < 0 || end_lambda_idx >= self->lambda_num) {
+        if (end_lambda_idx < 0 || end_lambda_idx >= lambda_num) {
             char err_msg[128];
             sprintf(err_msg, "end_lambda_idx=%ld at insert_lambdas_pos[%ld] is out of range [0, %ld] of org_u_nks\n",
-            end_lambda_idx, i, self->lambda_num);
+            end_lambda_idx, i, lambda_num);
             PyErr_SetString(PyExc_TypeError, err_msg);
             return NULL;
         }
@@ -205,24 +124,24 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
         // compute probability of all samples in current inserted lambda
         // f_λ = -lnΣ_jΣ_n{ exp[-u_λ(x_jn)] / Σ_k{exp[f_k-u_k(x_jn)]} }
         double sum_p = 0.0;
-        double **all_u_samples = (double **)malloc(sizeof(double *) * self->lambda_num);
+//        double all_u_samples[lambda_num][samples_per_lambda];
+        double** all_u_samples = (double* *)malloc(sizeof(double*) * lambda_num);
 
-        for (long j = 0; j < self->lambda_num; j++) {
-            double *p_over_bias_list = (double *)malloc(sizeof(double) * self->samples_per_lambda);
-            for (long k = 0; k < self->samples_per_lambda; k ++) {
+        for (long j = 0; j < lambda_num; j++) {
+            all_u_samples[j] = (double *)malloc(sizeof(double) * samples_per_lambda);
+            for (long k = 0; k < samples_per_lambda; k ++) {
                 double bias = 0.0;
-                for (long l = 0; l < self->lambda_num; l ++) {
-                    bias += exp(self->f_k[l] - self->org_u_nks[j*(self->lambda_num*self->samples_per_lambda) + l*self->samples_per_lambda + k]);
+                for (long l = 0; l < lambda_num; l ++) {
+                    bias += exp(f_k[l] - org_u_nks[j*(lambda_num*samples_per_lambda) + l*samples_per_lambda + k]);
                 }
-                double p_over_bias = exp(-(self->org_u_nks[j*(self->lambda_num*self->samples_per_lambda) + start_lambda_idx*self->samples_per_lambda + k] * (1 - ratio)
-                + self->org_u_nks[j*(self->lambda_num*self->samples_per_lambda) + end_lambda_idx*self->samples_per_lambda + k] * ratio));
-                p_over_bias_list[k] = p_over_bias / (bias * self->samples_per_lambda);
-                sum_p += p_over_bias_list[k];
+                double p_over_bias = exp(-(org_u_nks[j*(lambda_num*samples_per_lambda) + start_lambda_idx*samples_per_lambda + k] * (1 - ratio)
+                + org_u_nks[j*(lambda_num*samples_per_lambda) + end_lambda_idx*samples_per_lambda + k] * ratio));
+                all_u_samples[j][k] = p_over_bias / (bias * samples_per_lambda);
+                sum_p += all_u_samples[j][k];
             }
-            all_u_samples[j] = p_over_bias_list;
         }
 //        double f_insert = -log(sum_p);
-        double f_insert = (1 - ratio) * self->f_k[start_lambda_idx] + ratio * self->f_k[end_lambda_idx];
+        double f_insert = (1 - ratio) * f_k[start_lambda_idx] + ratio * f_k[end_lambda_idx];
 
         LambdaInfoContextObject *op;
         // use org_idx to mark index of insert lambda
@@ -231,48 +150,51 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
 
         // pick samples for inserted lambda by weight
         // p_λ(x) = exp[f_λ-u_λ(x)] / Σ_k{exp[f_k-u_k(x)]}
-        PickTag *candidate_tags = (PickTag*)malloc(sizeof(PickTag) * self->lambda_num * self->samples_per_lambda);
-        double stop_weight = 0.0;
-        for (long j = 0; j < self->lambda_num; j++) {
-            for (long k = 0; k < self->samples_per_lambda; k ++) {
-                long ptr = j * self->samples_per_lambda + k;
-                stop_weight += all_u_samples[j][k] / sum_p;
-                candidate_tags[ptr].stop_weight = stop_weight;
-                candidate_tags[ptr].weight = all_u_samples[j][k] / sum_p;
-                candidate_tags[ptr].lambda_idx = j;
-                candidate_tags[ptr].sample_idx_at_lambda = k;
-            }
-        }
-
-        pick_tags_list[i] = (PickTag*)malloc(sizeof(PickTag) * self->samples_per_lambda);
-        for (long j = 0; j < self->samples_per_lambda; j++) {
+        pick_tags_list[i] = (PickTag*)malloc(sizeof(PickTag) * samples_per_lambda);
+        for (long j = 0; j < samples_per_lambda; j++) {
             double rand_choice_weight_at = rand()*1.0 / RAND_MAX;
-            long select_tag_idx = self->samples_per_lambda * self->lambda_num - 1;
-            for (long k = 0; k < self->samples_per_lambda * self->lambda_num; k++) {
-                if (candidate_tags[k].stop_weight > rand_choice_weight_at) {
-                    select_tag_idx = k;
+            long select_k = lambda_num - 1;
+            long select_l = samples_per_lambda - 1;
+            double select_weight = 0.0;
+            double stop_weight = 0.0;
+            int find_flag = 0;
+
+            for (long k = 0; k < lambda_num; k++) {
+                for (long l = 0; l < samples_per_lambda; l++) {
+                    select_weight = all_u_samples[k][l] / sum_p;
+                    stop_weight += select_weight;
+                    if (stop_weight > rand_choice_weight_at) {
+                        select_k = k;
+                        select_l = l;
+                        find_flag = 1;
+                        break;
+                    }
+                }
+                if (find_flag) {
                     break;
                 }
             }
-            pick_tags_list[i][j].stop_weight = candidate_tags[select_tag_idx].stop_weight;
-            pick_tags_list[i][j].weight = candidate_tags[select_tag_idx].weight;
-            pick_tags_list[i][j].lambda_idx = candidate_tags[select_tag_idx].lambda_idx;
-            pick_tags_list[i][j].sample_idx_at_lambda = candidate_tags[select_tag_idx].sample_idx_at_lambda;
+            pick_tags_list[i][j].stop_weight = stop_weight;
+            pick_tags_list[i][j].weight = select_weight;
+            pick_tags_list[i][j].lambda_idx = select_k;
+            pick_tags_list[i][j].sample_idx_at_lambda = select_l;
         }
 
-        // free candidate_tags
-        free(candidate_tags);
-        // free all_u_samples
-        for (long j = 0; j < self->lambda_num; j++) {
+//         free all_u_samples
+        for (long j = 0; j < lambda_num; j++) {
             free(all_u_samples[j]);
+            all_u_samples[j] = NULL;
         }
         free(all_u_samples);
         all_u_samples = NULL;
     }
 
     // generate fake sampling for inserted lambda and reorder u_nks for all lambdas
-    long all_lambdas_info_size = PyList_Size(all_lambdas_info);
-    double *bp_u_nks = (double *)malloc(all_lambdas_info_size * all_lambdas_info_size * self->samples_per_lambda * sizeof(double));
+    Py_ssize_t all_lambdas_info_size = PyList_Size(all_lambdas_info);
+    double *bp_u_nks = (double *)malloc(all_lambdas_info_size * all_lambdas_info_size * samples_per_lambda * sizeof(double));
+//    printf("malloc bp_u_nks length: %ld, size: %ld\n",
+//    all_lambdas_info_size * all_lambdas_info_size * samples_per_lambda,
+//    all_lambdas_info_size * all_lambdas_info_size * samples_per_lambda * sizeof(double));
     for (long cur_idx = 0; cur_idx < all_lambdas_info_size; cur_idx++) {
         LambdaInfoContextObject* cur_info = (LambdaInfoContextObject *) PyList_GetItem(all_lambdas_info, cur_idx);
 
@@ -287,18 +209,18 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
 
                 if (! iter_info->context->is_insert) {
                     long iter_org_idx = iter_info->context->org_idx;
-                    for (long i = 0; i < self->samples_per_lambda; i++) {
-                        bp_u_nks[cur_idx*(all_lambdas_info_size*self->samples_per_lambda) + iter_idx*self->samples_per_lambda + i] =
-                        self->org_u_nks[cur_org_idx*(self->lambda_num*self->samples_per_lambda) + iter_org_idx*self->samples_per_lambda + i];
+                    for (long i = 0; i < samples_per_lambda; i++) {
+                        bp_u_nks[cur_idx*(all_lambdas_info_size*samples_per_lambda) + iter_idx*samples_per_lambda + i] =
+                        org_u_nks[cur_org_idx*(lambda_num*samples_per_lambda) + iter_org_idx*samples_per_lambda + i];
                     }
                 } else {
                     double iter_ratio = iter_info->context->ratio;
                     long iter_start_lambda_idx = iter_info->context->start_lambda_idx;
                     long iter_end_lambda_idx = iter_info->context->end_lambda_idx;
-                    for (long i = 0; i < self->samples_per_lambda; i++) {
-                        bp_u_nks[cur_idx*(all_lambdas_info_size*self->samples_per_lambda) + iter_idx*self->samples_per_lambda + i] =
-                        self->org_u_nks[cur_org_idx*(self->lambda_num*self->samples_per_lambda) + iter_start_lambda_idx*self->samples_per_lambda + i] * (1 - iter_ratio) +
-                        self->org_u_nks[cur_org_idx*(self->lambda_num*self->samples_per_lambda) + iter_end_lambda_idx*self->samples_per_lambda + i] * iter_ratio;
+                    for (long i = 0; i < samples_per_lambda; i++) {
+                        bp_u_nks[cur_idx*(all_lambdas_info_size*samples_per_lambda) + iter_idx*samples_per_lambda + i] =
+                        org_u_nks[cur_org_idx*(lambda_num*samples_per_lambda) + iter_start_lambda_idx*samples_per_lambda + i] * (1 - iter_ratio) +
+                        org_u_nks[cur_org_idx*(lambda_num*samples_per_lambda) + iter_end_lambda_idx*samples_per_lambda + i] * iter_ratio;
                     }
                 }
 
@@ -308,11 +230,11 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
                 if (! iter_info->context->is_insert) {
                     long iter_org_idx = iter_info->context->org_idx;
 
-                    for (long i = 0; i < self->samples_per_lambda; i++) {
+                    for (long i = 0; i < samples_per_lambda; i++) {
                         long l_idx = cur_pick_tag_list[i].lambda_idx;
                         long s_idx = cur_pick_tag_list[i].sample_idx_at_lambda;
-                        bp_u_nks[cur_idx*(all_lambdas_info_size*self->samples_per_lambda) + iter_idx*self->samples_per_lambda + i] =
-                        self->org_u_nks[l_idx*(self->lambda_num*self->samples_per_lambda) + iter_org_idx*self->samples_per_lambda + s_idx];
+                        bp_u_nks[cur_idx*(all_lambdas_info_size*samples_per_lambda) + iter_idx*samples_per_lambda + i] =
+                        org_u_nks[l_idx*(lambda_num*samples_per_lambda) + iter_org_idx*samples_per_lambda + s_idx];
                     }
 
                 } else {
@@ -320,12 +242,12 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
                     long iter_start_lambda_idx = iter_info->context->start_lambda_idx;
                     long iter_end_lambda_idx = iter_info->context->end_lambda_idx;
 
-                    for (long i = 0; i < self->samples_per_lambda; i++) {
+                    for (long i = 0; i < samples_per_lambda; i++) {
                         long l_idx = cur_pick_tag_list[i].lambda_idx;
                         long s_idx = cur_pick_tag_list[i].sample_idx_at_lambda;
-                        bp_u_nks[cur_idx*(all_lambdas_info_size*self->samples_per_lambda) + iter_idx*self->samples_per_lambda + i] =
-                        self->org_u_nks[l_idx*(self->lambda_num*self->samples_per_lambda) + iter_start_lambda_idx*self->samples_per_lambda + s_idx] * (1 - iter_ratio) +
-                        self->org_u_nks[l_idx*(self->lambda_num*self->samples_per_lambda) + iter_end_lambda_idx*self->samples_per_lambda + s_idx] * iter_ratio;
+                        bp_u_nks[cur_idx*(all_lambdas_info_size*samples_per_lambda) + iter_idx*samples_per_lambda + i] =
+                        org_u_nks[l_idx*(lambda_num*samples_per_lambda) + iter_start_lambda_idx*samples_per_lambda + s_idx] * (1 - iter_ratio) +
+                        org_u_nks[l_idx*(lambda_num*samples_per_lambda) + iter_end_lambda_idx*samples_per_lambda + s_idx] * iter_ratio;
                     }
                 }
 
@@ -337,18 +259,21 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
     // free pick_tags_list
     for (long i = 0; i < insert_lambdas_size; i++) {
         free(pick_tags_list[i]);
+        pick_tags_list[i] = NULL;
     }
     free(pick_tags_list);
     pick_tags_list = NULL;
 
     // bp_u_nks to PyList
     PyObject *bp_u_nks_list = PyList_New(all_lambdas_info_size);
+    PyObject *temp;
     for (long i = 0; i < all_lambdas_info_size; i++) {
         PyObject *op1 = PyList_New(all_lambdas_info_size);
         for (long j = 0; j < all_lambdas_info_size; j++) {
-            PyObject *op2 = PyList_New(self->samples_per_lambda);
-            for (long k = 0; k < self->samples_per_lambda; k++) {
-                PyList_SET_ITEM(op2, k, PyFloat_FromDouble(bp_u_nks[i*(all_lambdas_info_size*self->samples_per_lambda) + j*self->samples_per_lambda + k]));
+            PyObject *op2 = PyList_New(samples_per_lambda);
+            for (long k = 0; k < samples_per_lambda; k++) {
+                temp = PyFloat_FromDouble(bp_u_nks[i*(all_lambdas_info_size*samples_per_lambda) + j*samples_per_lambda + k]);
+                PyList_SET_ITEM(op2, k, temp);
             }
             PyList_SET_ITEM(op1, j, op2);
         }
@@ -359,49 +284,12 @@ SampleGeneratorObject_genSamplesForInsertLambda(SampleGeneratorObject *self, PyO
     free(bp_u_nks);
     bp_u_nks = NULL;
 
+    Py_XDECREF(insert_lambdas_pos);
+    Py_XDECREF(input_org_u_nks);
+    Py_XDECREF(input_f_k);
     return Py_BuildValue("OO", bp_u_nks_list, all_lambdas_info);
 }
 
-static PyGetSetDef SampleGeneratorObject_getsetters[] = {
-    {"org_u_nks", (getter)SampleGeneratorObject_get_org_u_nks, NULL, "org_u_nks", NULL},
-    {"f_k", (getter)SampleGeneratorObject_get_f_k, NULL, "f_k", NULL},
-    {NULL}  /* Sentinel */
-};
-
-static PyMemberDef SampleGeneratorObject_members[] = {
-    {"lambda_num", T_INT, offsetof(SampleGeneratorObject, lambda_num), 0,
-     "number of lambdas"},
-    {"samples_per_lambda", T_INT, offsetof(SampleGeneratorObject, samples_per_lambda), 0,
-     "number of potential samples at each lambda"},
-    {NULL}  /* Sentinel */
-};
-
-static PyMethodDef SampleGeneratorObject_methods[] = {
-    {"genSamplesForInsertLambda",
-    (PyCFunction)SampleGeneratorObject_genSamplesForInsertLambda,
-    METH_VARARGS | METH_KEYWORDS,
-     "genSamplesForInsertLambda(insert_lambdas_pos: list[tuple(int, int, float)]) \n"
-     "-> Tuple[bp_u_nks: List[List[List[float]]], all_lambdas_info: List[LambdaInfoContext]]"},
-    {NULL}  /* Sentinel */
-};
-
-PyTypeObject SampleGeneratorObjectType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "sample_generator.SampleGenerator",
-    .tp_basicsize = sizeof(SampleGeneratorObject),
-    .tp_itemsize = 0,
-    .tp_dealloc = (destructor)SampleGeneratorObject_dealloc,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-    .tp_doc = "SampleGenerator objects\n"
-              "SampleGenerator(lambda_num: int, samples_per_lambda: int, org_u_nks: list[list[list[float]]])\n\n",
-    .tp_methods = SampleGeneratorObject_methods,
-    .tp_members = SampleGeneratorObject_members,
-    .tp_getset = SampleGeneratorObject_getsetters,
-    .tp_init = (initproc)SampleGeneratorObject_init,
-    .tp_new = SampleGeneratorObject_new,
-};
-
-// module sample_generator
 static PyObject *
 SampleGeneratorModule_copy_context(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -416,6 +304,10 @@ SampleGeneratorModule_copy_context(PyObject *self, PyObject *args, PyObject *kwd
 }
 
 static PyMethodDef SampleGeneratorModule_methods[] = {
+    {"genSamplesForInsertLambda", (PyCFunction)SampleGeneratorModule_genSamplesForInsertLambda, METH_VARARGS | METH_KEYWORDS,
+    "genSamplesForInsertLambda(lambda_num: int, samples_per_lambda: int, "
+    "org_u_nks: list[list[list[float]]], f_k: list[float], "
+    "insert_lambdas_pos: list[Tuple(int, int, float)])\n"},
     {"copyLambdaInfoContextFromProperties", (PyCFunction)SampleGeneratorModule_copy_context, METH_VARARGS | METH_KEYWORDS,
     "create a new LambdaInfoContext object from properties of an exist object\n"},
     {NULL}  /* Sentinel */
@@ -440,12 +332,7 @@ PyInit_sample_generator(void)
     if (PyType_Ready(&LambdaInfoContextObjectType) < 0)
         return NULL;
 
-    if (PyType_Ready(&SampleGeneratorObjectType) < 0)
-        return NULL;
-
     Py_INCREF(&LambdaInfoContextObjectType);
     PyModule_AddObject(m, "LambdaInfoContext", (PyObject *) &LambdaInfoContextObjectType);
-    Py_INCREF(&SampleGeneratorObjectType);
-    PyModule_AddObject(m, "SampleGenerator", (PyObject *) &SampleGeneratorObjectType);
     return m;
 }

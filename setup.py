@@ -9,11 +9,9 @@ ising_module = Extension('ising', sources=['ising/ising_model.c'])
 dp_optimizer_module = Extension('dp_optimizer',
                                 sources=[
                                     'shortest_path_opt/source/dp_info.c',
-                                    'shortest_path_opt/source/dp_shortest_path_optimizer.c',
                                     'shortest_path_opt/source/dp_optimizer.c',
                                 ],
-                                include_dirs=include_dirs + ['shortest_path_opt/include/',
-                                                             'shortest_path_opt/'])
+                                include_dirs=include_dirs + ['shortest_path_opt/include/'])
 
 sample_generator_module = Extension('sample_generator',
                                     sources=['extend_lambdas/source/lambda_info_context.c',

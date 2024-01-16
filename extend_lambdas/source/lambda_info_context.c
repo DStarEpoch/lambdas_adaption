@@ -28,6 +28,10 @@ void initLambdaInfoContext(LambdaInfoContext *self, long start_lambda_idx, long 
 void freeLambdaInfoContext(LambdaInfoContext *self) {
     if (self == NULL)
         return;
+    free(self->getStr);
+    self->getStr = NULL;
+    free(self->getRank);
+    self->getRank = NULL;
     free(self);
 }
 
