@@ -224,7 +224,7 @@ DPOptimizer_optimize(PyObject *self, PyObject *args, PyObject *kwds)
 static PyMethodDef DPOptimizer_methods[] = {
     {"optimize", (PyCFunction)DPOptimizer_optimize, METH_VARARGS | METH_KEYWORDS,
     "function of optimizing lambda selection\n"
-    "optimize(distance_matrix: List[List[float]], target_lambda_num: int, retain_lambdas_idx: List[int])\n"
+    "optimize(distance_matrix: List[List[float]], retain_lambda_idx: List[int], target_lambda_num: int)\n"
         "--\n"
         "\n"
         "find shortest pathway with certain points number as target_lambda_num by dynamic programming.\n"
@@ -233,10 +233,10 @@ static PyMethodDef DPOptimizer_methods[] = {
         "----------\n"
         "distance_matrix: List[List[float]], required\n"
         "    matrix of [-ΔλΔU]\n"
+        "retain_lambda_idx : List[int], required"
+        "    lambda indexes that forced to be retained\n"
         "target_lambda_num : int, required\n"
         "    Total number of steps to perform\n"
-        "retain_lambdas_idx : List[int], required"
-        "    lambda indexes that forced to be retained\n"
         "Returns\n"
         "-------\n"
         "min_cost : float\n"

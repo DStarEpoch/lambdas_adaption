@@ -77,7 +77,8 @@ SampleGeneratorModule_genSamplesForInsertLambda(PyObject *self, PyObject *args, 
     }
 
     time_t t;
-    srand((unsigned) time(&t));
+    unsigned seed = (unsigned) time(&t);
+    srand(seed);
 
     Py_ssize_t insert_lambdas_size = PyList_Size(insert_lambdas_pos);
     PyObject *all_lambdas_info = PyList_New(lambda_num);
@@ -122,26 +123,32 @@ SampleGeneratorModule_genSamplesForInsertLambda(PyObject *self, PyObject *args, 
         // check end
 
         // compute probability of all samples in current inserted lambda
-        // f_λ = -lnΣ_jΣ_n{ exp[-u_λ(x_jn)] / Σ_k{exp[f_k-u_k(x_jn)]} }
+        // f_λ = -lnΣ_jΣ_n{ exp[-u_λ(x_jn)] / Σ_k{N_k * exp[f_k-u_k(x_jn)]} }
         double sum_p = 0.0;
-//        double all_u_samples[lambda_num][samples_per_lambda];
         double** all_u_samples = (double* *)malloc(sizeof(double*) * lambda_num);
+        // guess f_λ for avoiding overflow
+        double f_insert = (1 - ratio) * f_k[start_lambda_idx] + ratio * f_k[end_lambda_idx];
 
         for (long j = 0; j < lambda_num; j++) {
             all_u_samples[j] = (double *)malloc(sizeof(double) * samples_per_lambda);
             for (long k = 0; k < samples_per_lambda; k ++) {
+                double u_inserted = org_u_nks[j*(lambda_num*samples_per_lambda) + start_lambda_idx*samples_per_lambda + k] * (1 - ratio)
+                + org_u_nks[j*(lambda_num*samples_per_lambda) + end_lambda_idx*samples_per_lambda + k] * ratio;
                 double bias = 0.0;
+
+                // p_λ(x) = 1 / (Σ_j{N_j * exp[f_j + u_λ(x) - u_j(x)]})
                 for (long l = 0; l < lambda_num; l ++) {
-                    bias += exp(f_k[l] - org_u_nks[j*(lambda_num*samples_per_lambda) + l*samples_per_lambda + k]);
+                    double log_bias_at_sample = f_k[l] - f_insert + u_inserted -
+                    org_u_nks[j*(lambda_num*samples_per_lambda) + l*samples_per_lambda + k];
+                    bias += exp(log_bias_at_sample);
                 }
-                double p_over_bias = exp(-(org_u_nks[j*(lambda_num*samples_per_lambda) + start_lambda_idx*samples_per_lambda + k] * (1 - ratio)
-                + org_u_nks[j*(lambda_num*samples_per_lambda) + end_lambda_idx*samples_per_lambda + k] * ratio));
-                all_u_samples[j][k] = p_over_bias / (bias * samples_per_lambda);
+
+                all_u_samples[j][k] = 1.0 / (bias * samples_per_lambda);
                 sum_p += all_u_samples[j][k];
             }
         }
-//        double f_insert = -log(sum_p);
-        double f_insert = (1 - ratio) * f_k[start_lambda_idx] + ratio * f_k[end_lambda_idx];
+//        printf("sum_p: %.5lf at lambda idx: %ld\n", sum_p, i);
+//        f_insert = -log(sum_p);
 
         LambdaInfoContextObject *op;
         // use org_idx to mark index of insert lambda

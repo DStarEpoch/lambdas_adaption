@@ -60,14 +60,17 @@ class RealDataHandler:
 
 def real_data_test(directory: str, temperature=310, target_lambda_num=32):
     import time
-    from shortest_path_opt.shortest_path import ShortestPath
+    from dp_optimizer import optimize
+    from util.opt_collections import buildDistanceMatrix
     handler = RealDataHandler.get_files_from_directory(directory=directory, temperature=temperature)
-    dp_shortest_path = ShortestPath(handler.u_nks)
+    u_nks_to_list = [org_u_nk.transpose().values.tolist() for org_u_nk in handler.u_nks]
+    distance_matrix = buildDistanceMatrix(u_nks_to_list)
     start_t = time.time()
-    min_cost, optimal_sequence = dp_shortest_path.optimize(target_lambda_num=target_lambda_num,
-                                                           retain_lambda_idx=list(range(8)))
+    min_cost, select_seq = optimize(distance_matrix=distance_matrix,
+                                    retain_lambda_idx=list(range(8)),
+                                    target_lambda_num=target_lambda_num)
     end_t = time.time()
-    print(f"min_cost: {min_cost} time: {end_t-start_t}\noptimal_sequence: {optimal_sequence}")
+    print(f"min_cost: {min_cost} time: {end_t-start_t}\nselect_seq: {select_seq}")
 
     enthalpies = handler.enthalpies
     color_list = ["red", "green", "blue", "yellow", "grey", "purple", "orange", "pink", "cyan", "brown"]
