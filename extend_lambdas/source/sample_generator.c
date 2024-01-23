@@ -53,19 +53,28 @@ SampleGeneratorModule_genSamplesForInsertLambda(PyObject *self, PyObject *args, 
         return NULL;
     }
 
+    if (!PyList_Check(input_f_k)) {
+        PyErr_SetString(PyExc_TypeError, "f_k must be list");
+        return NULL;
+    }
+
     if (!PyList_Check(insert_lambdas_pos)) {
         PyErr_SetString(PyExc_TypeError, "insert_lambdas_pos must be list");
         return NULL;
     }
 
+    if (!PyList_Check(input_org_u_nks)) {
+        PyErr_SetString(PyExc_TypeError, "org_u_nks must be list");
+        return NULL;
+    }
     double *org_u_nks = malloc(lambda_num * lambda_num * samples_per_lambda * sizeof(double));
     for (long i = 0; i < lambda_num; i++) {
-        PyObject *sample_from_lambda = PyList_GetItem(input_org_u_nks, i);
         for (long j = 0; j < lambda_num; j++) {
-            PyObject *eval_potential_at_lambda = PyList_GetItem(sample_from_lambda, j);
-            for (long k=0; k < samples_per_lambda; k++) {
-                double potential = PyFloat_AsDouble(PyList_GetItem(eval_potential_at_lambda, k));
-                org_u_nks[i * (lambda_num * samples_per_lambda) + j * samples_per_lambda + k] = potential;
+            for (long k = 0; k < samples_per_lambda; k ++) {
+                Py_ssize_t ptr_offset = i * (lambda_num * samples_per_lambda) + j * samples_per_lambda + k;
+                PyObject *item = PyList_GetItem(input_org_u_nks, ptr_offset);
+                double potential = PyFloat_AsDouble(item);
+                org_u_nks[ptr_offset] = potential;
             }
         }
     }
@@ -199,9 +208,6 @@ SampleGeneratorModule_genSamplesForInsertLambda(PyObject *self, PyObject *args, 
     // generate fake sampling for inserted lambda and reorder u_nks for all lambdas
     Py_ssize_t all_lambdas_info_size = PyList_Size(all_lambdas_info);
     double *bp_u_nks = (double *)malloc(all_lambdas_info_size * all_lambdas_info_size * samples_per_lambda * sizeof(double));
-//    printf("malloc bp_u_nks length: %ld, size: %ld\n",
-//    all_lambdas_info_size * all_lambdas_info_size * samples_per_lambda,
-//    all_lambdas_info_size * all_lambdas_info_size * samples_per_lambda * sizeof(double));
     for (long cur_idx = 0; cur_idx < all_lambdas_info_size; cur_idx++) {
         LambdaInfoContextObject* cur_info = (LambdaInfoContextObject *) PyList_GetItem(all_lambdas_info, cur_idx);
 
@@ -290,6 +296,12 @@ SampleGeneratorModule_genSamplesForInsertLambda(PyObject *self, PyObject *args, 
     // free bp_u_nks
     free(bp_u_nks);
     bp_u_nks = NULL;
+
+    // free org_u_nks, f_k
+    free(org_u_nks);
+    org_u_nks = NULL;
+    free(f_k);
+    f_k = NULL;
 
     Py_XDECREF(insert_lambdas_pos);
     Py_XDECREF(input_org_u_nks);

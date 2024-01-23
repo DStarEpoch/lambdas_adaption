@@ -1,94 +1,124 @@
 # -*- coding:utf-8 -*-
 import numpy as np
 import pandas as pd
-from pathlib import Path
 import matplotlib.pyplot as plt
+from typing import List, Tuple
 from alchemlyb.estimators import MBAR
 from util.real_data_handler import RealDataHandler
-from alchemlyb.visualisation import plot_mbar_overlap_matrix
-from util.dp_evenly_overlap import DPOptimizer
-from util.calc_partial_overlap import calc_partial_overlap_matrix
-
-fig_path = Path("./figures")
-fig_path.mkdir(parents=True, exist_ok=True)
-
-system_output_path = Path("./real_data/ejm_31")
-sim_type = "abfe"
-org_u_nks = RealDataHandler.get_files_from_directory(directory=system_output_path / sim_type,
-                                                     energy_file_name="prod_npt.csv").u_nks
-STATE_NUM = len(org_u_nks)
-u_nks = pd.concat([u_nk for u_nk in org_u_nks])
-mbar_estimator = MBAR(method="L-BFGS-B").fit(u_nks)
-
-plot_data = {
-    "x": [],
-    "estimate": [],
-    "real": [],
-}
-f_k = [0.0]
-for i in range(len(mbar_estimator.delta_f_) - 1):
-    f_k.append(mbar_estimator.delta_f_.iloc[i, i+1] + f_k[i])
-    print(f"{i} -> {i+1}: {mbar_estimator.delta_f_.iloc[i, i+1]}, f_k: {f_k[i+1]}")
-ax = plot_mbar_overlap_matrix(mbar_estimator.overlap_matrix)
-plt.show()
-org_overlap_matrix = mbar_estimator.overlap_matrix
+from util.opt_collections import buildDistanceMatrix
+from util.opt_collections import adaptionInsertLambdas
 
 
-partial_overlap_matrix_list = calc_partial_overlap_matrix(mbar_estimator)
+def FrobeniusNorm(m1: np.matrix, m2: np.matrix):
+    return np.sqrt(abs(np.trace(np.dot(m1, m2.T))))
 
-# estimate_start_lambda_idx = 15
-# estimate_end_lambda_idx = 36
-# estimate_start_lambda_idx = 20
-# estimate_end_lambda_idx = 41
-estimate_start_lambda_idx = 25
-estimate_end_lambda_idx = 46
-i = estimate_start_lambda_idx
-for j in range(estimate_start_lambda_idx+1, estimate_end_lambda_idx):
-    test_u_nks = []
-    remove_lambda_list = list(range(estimate_start_lambda_idx + 1, j)) + [2, 5, 7, 50, 53, 57, 60]
-    remain_lambda_list = [l for l in range(STATE_NUM) if l not in remove_lambda_list]
+
+def matrixFidelity(org_m: np.matrix, eval_m: np.matrix):
+    org_norm = FrobeniusNorm(org_m, org_m)
+    d_m = eval_m - org_m
+    delta_norm = FrobeniusNorm(d_m, org_m)
+    return (org_norm - delta_norm) / org_norm
+
+
+def selectFromUNKS(u_nks: List[pd.DataFrame], select_lambdas_idx: List[int]) -> List[pd.DataFrame]:
+    remove_lambdas_idx = [l for l in range(len(u_nks)) if l not in select_lambdas_idx]
+    ret_u_nks = []
     lc = -1
-    for o in remain_lambda_list:
+    for o in select_lambdas_idx:
         lc += 1
-        u_k = org_u_nks[o].drop(columns=[str(l) for l in remove_lambda_list])
+        u_k = u_nks[o].drop(columns=[str(l) for l in remove_lambdas_idx])
         u_k.columns = [f'{i}' for i in range(len(u_k.columns))]
         # add a column to df for using groupby
         u_k['lambda'] = f"lambda_{lc}"
         u_k['window'] = f"{lc}"
         # set lambda index for later groupby
         u_k = u_k.set_index(['lambda', 'window'])
-        test_u_nks.append(u_k)
-    test_start_lambda_idx = -1
-    for i in range(estimate_start_lambda_idx + 1):
-        if i in remain_lambda_list:
-            test_start_lambda_idx += 1
-    test_u_nks = pd.concat([u_nk for u_nk in test_u_nks])
-    test_mbar_estimator = MBAR(method="L-BFGS-B").fit(test_u_nks)
-    test_overlap_matrix = test_mbar_estimator.overlap_matrix
-
-    C1 = sum([partial_overlap_matrix_list[k][i][j] for k in remain_lambda_list])
-    C2 = sum([partial_overlap_matrix_list[k][i][j] for k in range(STATE_NUM)])
-    print("\nC1: {}, C2: {}".format(C1, C2))
-    C = C2 / C1
-    print(f"{estimate_start_lambda_idx}->{j}, C: {C}, "
-          f"\nestimate overlap: {org_overlap_matrix[estimate_start_lambda_idx, j] * C}, "
-          f"\nreal overlap {test_start_lambda_idx}->{test_start_lambda_idx + 1}: "
-          f"{test_overlap_matrix[test_start_lambda_idx, test_start_lambda_idx + 1]}")
-    plot_data["x"].append(f"{estimate_start_lambda_idx}->{j}")
-    plot_data["estimate"].append(org_overlap_matrix[estimate_start_lambda_idx, j] * C)
-    plot_data["real"].append(test_overlap_matrix[test_start_lambda_idx, test_start_lambda_idx + 1])
-
-plt.close("all")
-h1 = plt.plot(range(len(plot_data["estimate"])), plot_data["estimate"], color="red", marker="o")
-h2 = plt.plot(range(len(plot_data["real"])), plot_data["real"], color="blue", marker="^")
-plt.legend(handles=[h1[0], h2[0]], labels=["estimate", "real"], loc="best")
-plt.xticks(range(len(plot_data["x"])), plot_data["x"], rotation=45)
-plt.show()
+        ret_u_nks.append(u_k)
+    return ret_u_nks
 
 
-dp_optimizer = DPOptimizer(org_overlap_matrix=org_overlap_matrix,
-                           partial_overlap_matrix_list=partial_overlap_matrix_list,
-                           target_lambda_num=8)
-for e in np.arange(0, 1.25, 0.05):
-    cost, seq, opt_mean = dp_optimizer.optimize(estimate_mean=e)
-    print(f"estimate_mean: {e}, \ncost: {cost}, \nseq: {seq}, \nopt_mean: {opt_mean}\n")
+def dropFromUNKS(org_f_k: List[float], interval: float = 1) \
+        -> Tuple[List[float], List[Tuple[int, int, float]], List[int]]:
+    """
+    :param
+    org_f_k: List[float], original free energy list
+    interval: float, drop lambdas by interval
+
+    :return:
+    new_f_k: List[float], new free energy list for remaining lambdas
+    remove_lambda_pos: List[Tuple[int, int, float]], list of dropped lambdas position, format (start, end, ratio)
+    remain_lambda_idx: List[int],
+    """
+    remain_len = round((len(org_f_k) - 1) / (interval + 1)) + 1
+    spacing = (len(org_f_k) - 1) * 1.0 / remain_len
+
+    # decide which lambdas to remove
+    remove_lambda_idx = list()
+    remaining_lambdas = [0]
+    for i in range(remain_len):
+        target_position = round((i + 1) * spacing)
+        for j in range(remaining_lambdas[-1] + 1, target_position):
+            remove_lambda_idx.append(j)
+        remaining_lambdas.append(target_position)
+
+    remain_f_k = [org_f_k[idx] for idx in remaining_lambdas]
+
+    org_lambda_idx_to_new_lambda_idx = {v: i for i, v in enumerate(remaining_lambdas)}
+    remove_lambdas_pos = []
+    for i in remove_lambda_idx:
+        i_pre = i_next = remaining_lambdas[0]
+        for j in remaining_lambdas:
+            if j > i:
+                i_next = j
+                break
+            i_pre = j
+        ratio = (i - i_pre) / (i_next - i_pre)
+        i_pre = org_lambda_idx_to_new_lambda_idx[i_pre]
+        i_next = org_lambda_idx_to_new_lambda_idx[i_next]
+        remove_lambdas_pos.append((i_pre, i_next, ratio))
+
+    return remain_f_k, remove_lambdas_pos, remaining_lambdas
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--directory", type=str, help="simulation data directory path which should"
+                                                            "contain path of windows of prod_npt.csv")
+    parser.add_argument("-t", "--temperature", type=float, default=310, help="(Kelvin)")
+    args = parser.parse_args()
+
+    org_u_nks = RealDataHandler.get_files_from_directory(directory=args.directory, temperature=args.temperature).u_nks
+    mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in org_u_nks]))
+    org_distance_matrix = buildDistanceMatrix([u_nk.transpose().values.tolist() for u_nk in org_u_nks])
+    org_exp_m = np.asmatrix(np.exp(-np.asarray(org_distance_matrix)))
+
+    f_k = [0.0]
+    for i in range(len(mbar_estimator.delta_f_) - 1):
+        f_k.append(mbar_estimator.delta_f_.iloc[i, i+1] + f_k[i])
+    del mbar_estimator
+
+    fidelity_list = []
+    for intvl in range(1, 9):
+        new_f_k, insert_lambdas_pos, remain_lambda_idx = dropFromUNKS(f_k, intvl)
+        new_u_nks = selectFromUNKS(org_u_nks, remain_lambda_idx)
+        bp_u_nks, all_lambdas_info = adaptionInsertLambdas(new_u_nks, f_k=new_f_k,
+                                                           insert_lambdas_pos=insert_lambdas_pos)
+
+        predict_distance_matrix = buildDistanceMatrix(bp_u_nks)
+        predict_distance_matrix = np.asmatrix(np.exp(-np.asarray(predict_distance_matrix)))
+
+        fidelity = matrixFidelity(predict_distance_matrix, org_exp_m)
+        fidelity_list.append((intvl, fidelity))
+
+        bp_u_nks.clear()
+        all_lambdas_info.clear()
+        del bp_u_nks
+        del all_lambdas_info
+        print(f"interval: {intvl}, fidelity: {fidelity}")
+
+    fidelity_list = np.asarray(fidelity_list)
+    plt.plot(fidelity_list[:, 0], fidelity_list[:, 1])
+    plt.gca().set(title='Matrix fidelity', ylabel='fidelity', xlabel="interval")
+    plt.show()

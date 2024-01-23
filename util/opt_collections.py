@@ -2,9 +2,9 @@
 import gc
 import numpy as np
 import pandas as pd
-from typing import List
-from alchemlyb.estimators import MBAR
+from typing import List, Tuple
 from dp_optimizer import optimize
+from alchemlyb.estimators import MBAR
 from sample_generator import LambdaInfoContext, genSamplesForInsertLambda
 
 
@@ -24,14 +24,20 @@ def buildDistanceMatrix(u_nks_to_list: List[List[List[float]]]) -> List[List[flo
     return distance_matrix
 
 
-def adaptionAndOptLambdas(org_u_nks: List[pd.DataFrame], target_lambda_num: int,
-                          retain_lambda_idx: List[int] = None, extends: int = 1, f_k: List[float] = None):
-    if not retain_lambda_idx:
-        retain_lambda_idx = [0, len(org_u_nks) - 1]
-    else:
-        retain_lambda_idx = list(set(retain_lambda_idx).union({0, len(org_u_nks) - 1}))
-        retain_lambda_idx.sort()
+def flattenUNKS(u_nks: List[pd.DataFrame]) -> Tuple[int, int, List[float]]:
+    u_nks_to_mul_dim_list: List[List[List[float]]] = [u_nk.transpose().values.tolist() for u_nk in u_nks]
+    lambda_num = len(u_nks_to_mul_dim_list)
+    samples_per_lambda = len(u_nks_to_mul_dim_list[0][0])
+    u_nks_to_1d_list = []
+    for i in range(lambda_num):
+        for j in range(lambda_num):
+            u_nks_to_1d_list.extend(u_nks_to_mul_dim_list[i][j])
+    return lambda_num, samples_per_lambda, u_nks_to_1d_list
 
+
+def adaptionInsertLambdas(org_u_nks: List[pd.DataFrame], extends: int = 1,
+                          f_k: List[float] = None, insert_lambdas_pos: List[Tuple[int, int, float]] = None) \
+        -> Tuple[List[List[List[float]]], List[LambdaInfoContext]]:
     if f_k is None:
         mbar_estimator = MBAR(method="L-BFGS-B").fit(pd.concat([u_nk for u_nk in org_u_nks]))
         f_k = [0.0]
@@ -40,19 +46,30 @@ def adaptionAndOptLambdas(org_u_nks: List[pd.DataFrame], target_lambda_num: int,
         del mbar_estimator
         gc.collect()
 
-    insert_lambdas_pos = []
-    for i in range(len(org_u_nks) - 1):
-        for t in range(extends):
-            insert_lambdas_pos.append((i, i + 1, (t + 1) * 1.0 / (extends + 1)))
+    if insert_lambdas_pos is None:
+        insert_lambdas_pos = []
+        for i in range(len(org_u_nks) - 1):
+            for t in range(extends):
+                insert_lambdas_pos.append((i, i + 1, (t + 1) * 1.0 / (extends + 1)))
 
-    org_u_nks_to_list: List[List[List[float]]] = [org_u_nk.transpose().values.tolist() for org_u_nk in org_u_nks]
-    lambda_num = len(org_u_nks_to_list)
-    samples_per_lambda = len(org_u_nks_to_list[0][0])
-    bp_u_nks, all_lambdas_info = genSamplesForInsertLambda(lambda_num=lambda_num, samples_per_lambda=samples_per_lambda,
+    lambda_num, samples_per_lambda, org_u_nks_to_list = flattenUNKS(org_u_nks)
+    bp_u_nks, all_lambdas_info = genSamplesForInsertLambda(lambda_num=lambda_num,
+                                                           samples_per_lambda=samples_per_lambda,
                                                            org_u_nks=org_u_nks_to_list, f_k=f_k,
                                                            insert_lambdas_pos=insert_lambdas_pos)
-    bp_u_nks: List[List[List[float]]]
-    all_lambdas_info: List[LambdaInfoContext]
+    return bp_u_nks, all_lambdas_info
+
+
+def adaptionAndOptLambdas(org_u_nks: List[pd.DataFrame], target_lambda_num: int,
+                          retain_lambda_idx: List[int] = None, extends: int = 1,
+                          f_k: List[float] = None, insert_lambdas_pos: List[Tuple[int, int, float]] = None):
+    bp_u_nks, all_lambdas_info = adaptionInsertLambdas(org_u_nks, extends, f_k, insert_lambdas_pos)
+
+    if not retain_lambda_idx:
+        retain_lambda_idx = [0, len(org_u_nks) - 1]
+    else:
+        retain_lambda_idx = list(set(retain_lambda_idx).union({0, len(org_u_nks) - 1}))
+        retain_lambda_idx.sort()
 
     retain_lambda_idx = list({idx for idx in range(len(all_lambdas_info)) if
                                (not all_lambdas_info[idx].is_insert and all_lambdas_info[idx].org_idx
